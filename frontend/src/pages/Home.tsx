@@ -50,7 +50,7 @@ function InfrastructureCard() {
   }, [check]);
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-wizard-panel p-6">
+    <section className="wizard-surface rounded-2xl border border-white/10 p-6 shadow-xl shadow-black/30">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold">Infrastructure</h2>
         {statusBadge(status)}
@@ -110,7 +110,7 @@ function ChangePasswordForm() {
   }
 
   const inputClass =
-    'w-full rounded-xl border border-white/10 bg-wizard-bubble-in px-4 py-2.5 text-wizard-text outline-none transition focus:border-wizard-green-500';
+    'w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-wizard-text outline-none transition placeholder:text-wizard-muted/60 focus:border-wizard-green-500 focus:bg-white/[0.07] focus:shadow-[0_0_0_4px_rgba(0,168,132,0.12)]';
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
@@ -206,11 +206,13 @@ export default function Home() {
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12">
       <header className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-wizard-green-600 text-2xl font-bold text-white">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-wizard-green-500 to-wizard-green-700 text-2xl font-extrabold text-white shadow-lg shadow-wizard-green-500/25 ring-1 ring-white/10">
             W
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">WizardChat</h1>
+            <h1 className="text-2xl font-bold tracking-tight">
+              <span className="wizard-grad-text">WizardChat</span>
+            </h1>
             <p className="text-sm text-wizard-muted">Secure messaging · end-to-end encrypted</p>
           </div>
         </div>
@@ -219,7 +221,7 @@ export default function Home() {
             type="button"
             onClick={() => void handleLogout()}
             disabled={loggingOut}
-            className="rounded-xl border border-white/10 px-4 py-2 text-sm text-wizard-muted transition hover:border-red-400/50 hover:text-red-400 disabled:opacity-50"
+            className="rounded-xl border border-white/10 px-4 py-2 text-sm text-wizard-muted transition hover:border-red-400/50 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
           >
             {loggingOut ? 'Signing out…' : 'Sign out'}
           </button>
@@ -228,9 +230,9 @@ export default function Home() {
 
       <main className="mt-10 flex flex-1 flex-col gap-6">
         {user ? (
-          <section className="rounded-2xl border border-white/10 bg-wizard-panel p-6">
+          <section className="wizard-surface rounded-2xl border border-white/10 p-6 shadow-xl shadow-black/30">
             <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-wizard-green-600 text-xl font-bold text-white uppercase">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-wizard-green-500 to-wizard-green-700 text-xl font-bold text-white uppercase shadow-md shadow-wizard-green-600/20 ring-2 ring-white/10">
                 {user.username.slice(0, 2)}
               </div>
               <div>
@@ -238,7 +240,7 @@ export default function Home() {
                 {user.email && <p className="text-sm text-wizard-muted">{user.email}</p>}
               </div>
               <span
-                className={`ml-auto rounded-full px-3 py-1 text-xs font-semibold ${
+                className={`ml-auto rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-white/10 ${
                   user.role === 'ADMIN' ? 'bg-amber-500/20 text-amber-400' : 'bg-white/10 text-wizard-muted'
                 }`}
               >
@@ -247,13 +249,13 @@ export default function Home() {
             </div>
             <p className="mt-4 text-sm text-wizard-muted">
               You are signed in.{' '}
-              <Link to="/" className="text-wizard-green-500 hover:underline">
+              <Link to="/" className="font-medium text-wizard-green-500 transition hover:text-wizard-green-100">
                 Open your chats →
               </Link>
               {user.role === 'ADMIN' && (
                 <>
                   {' '}·{' '}
-                  <Link to="/admin" className="text-amber-400 hover:underline">
+                  <Link to="/admin" className="font-medium text-amber-400 transition hover:text-amber-300">
                     Admin panel →
                   </Link>
                 </>
@@ -261,7 +263,7 @@ export default function Home() {
             </p>
           </section>
         ) : (
-          <section className="rounded-2xl border border-white/10 bg-wizard-panel p-8 text-center">
+          <section className="wizard-surface rounded-2xl border border-white/10 p-8 text-center shadow-xl shadow-black/30">
             <h2 className="text-xl font-semibold">Welcome to WizardChat</h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-wizard-muted">
               Sign in or create an account to start chatting. Every request is authenticated
@@ -270,13 +272,13 @@ export default function Home() {
             <div className="mt-6 flex justify-center gap-3">
               <Link
                 to="/login"
-                className="rounded-xl bg-wizard-green-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-wizard-green-700"
+                className="rounded-xl bg-gradient-to-b from-wizard-green-600 to-wizard-green-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-wizard-green-600/25 transition hover:brightness-110 active:scale-[0.99]"
               >
                 Sign in
               </Link>
               <Link
                 to="/register"
-                className="rounded-xl border border-white/10 px-5 py-2.5 text-sm font-semibold text-wizard-text transition hover:border-wizard-green-500"
+                className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-wizard-text transition hover:border-wizard-green-500 hover:bg-white/10"
               >
                 Create account
               </Link>
@@ -285,7 +287,7 @@ export default function Home() {
         )}
 
         {user && (
-          <section className="rounded-2xl border border-white/10 bg-wizard-panel p-6">
+          <section className="wizard-surface rounded-2xl border border-white/10 p-6 shadow-xl shadow-black/30">
             <h2 className="text-lg font-semibold">Change password</h2>
             <p className="mb-4 mt-1 text-sm text-wizard-muted">
               Changing your password revokes all other sessions on all devices.

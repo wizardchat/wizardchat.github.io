@@ -607,7 +607,7 @@ export default function Chat() {
 
   return (
     <div className="flex h-screen">
-      <aside className="w-80 shrink-0 border-r border-white/5 bg-wizard-green-900">
+      <aside className="w-80 shrink-0 border-r border-white/5 bg-wizard-panel/80 backdrop-blur-xl">
         <ChatList
           chats={chats}
           activeChatId={activeChat?.id ?? null}
@@ -660,7 +660,7 @@ export default function Chat() {
             <button
               type="button"
               onClick={() => void logout()}
-              className="shrink-0 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-wizard-muted transition hover:border-red-400/50 hover:text-red-400"
+              className="shrink-0 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-wizard-muted transition hover:border-red-400/50 hover:bg-red-500/10 hover:text-red-400"
             >
               Sign out
             </button>

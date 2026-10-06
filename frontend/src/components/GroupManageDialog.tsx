@@ -198,9 +198,9 @@ export default function GroupManageDialog({ chat, meId, onClose, onChanged }: Pr
   const candidates = addResults.filter((u) => !members.some((m) => m.userId === u.id));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl border border-white/10 bg-wizard-panel p-6"
+        className="wizard-surface flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl border border-white/10 p-6 shadow-2xl shadow-black/50"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

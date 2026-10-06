@@ -285,7 +285,7 @@ export default function Admin() {
           placeholder="Search by username or email…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-xl border border-white/10 bg-wizard-bubble-in px-4 py-2.5 text-wizard-text outline-none transition focus:border-wizard-green-500"
+          className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-wizard-text outline-none transition placeholder:text-wizard-muted/60 focus:border-wizard-green-500 focus:bg-white/[0.07] focus:shadow-[0_0_0_4px_rgba(0,168,132,0.12)]"
         />
         <button
           type="submit"
@@ -303,7 +303,7 @@ export default function Admin() {
           <p className="text-sm text-wizard-muted">No users match that search.</p>
         ) : (
           users.map((u) => (
-            <div key={u.id} className="rounded-2xl border border-white/10 bg-wizard-panel p-4">
+            <div key={u.id} className="wizard-surface rounded-2xl border border-white/10 p-4 shadow-xl shadow-black/30">
               <div className="flex flex-wrap items-center gap-3">
                 <Avatar user={u} />
                 <div className="min-w-0 flex-1">

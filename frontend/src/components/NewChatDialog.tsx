@@ -64,9 +64,9 @@ export default function NewChatDialog({ onClose, onStartChat, onCreateGroup }: P
   const remaining = query.trim() ? results.filter((u) => !selected.some((x) => x.id === u.id)) : results;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-2xl border border-white/10 bg-wizard-panel p-6"
+        className="wizard-surface w-full max-w-md rounded-2xl border border-white/10 p-6 shadow-2xl shadow-black/50"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

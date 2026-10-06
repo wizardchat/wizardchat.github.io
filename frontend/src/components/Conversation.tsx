@@ -123,11 +123,14 @@ export default function Conversation(props: Props) {
 
   if (!chat) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-wizard-muted">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-wizard-green-700 text-3xl font-bold text-white">
+      <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center text-wizard-muted">
+        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-wizard-green-500 to-wizard-green-700 text-4xl font-extrabold text-white shadow-2xl shadow-wizard-green-600/30 ring-1 ring-white/10">
           W
         </div>
-        <p className="text-sm">Select a chat to start messaging</p>
+        <div>
+          <p className="text-base font-semibold text-wizard-text">Your conversations live here</p>
+          <p className="mt-1 text-sm">Select a chat from the list to start messaging</p>
+        </div>
       </div>
     );
   }
@@ -138,14 +141,7 @@ export default function Conversation(props: Props) {
   const headerAvatarUrl = chat.type === 'GROUP' ? chat.avatarUrl : other?.avatarUrl ?? null;
   const headerAvatarName = chat.type === 'GROUP' ? title : other?.username ?? null;
   const groupOnline = chat.type === 'GROUP' ? chat.members.filter((m) => props.presence[m.userId]).length : 0;
-  const subtitle =
-    props.typingUsernames.length > 0
-      ? `${props.typingUsernames.join(', ')} typing…`
-      : chat.type === 'GROUP'
-        ? `${chat.members.length} members${groupOnline > 0 ? ` · ${groupOnline} online` : ''}`
-        : online
-          ? 'online'
-          : 'offline';
+  const subtitle = props.typingUsernames.length > 0 ? `${props.typingUsernames.join(', ')} typing…` : chat.type === 'GROUP' ? `${chat.members.length} members${groupOnline > 0 ? ` · ${groupOnline} online` : ''}` : online ? 'online' : 'offline';
   const isGroup = chat.type === 'GROUP';
 
   function handleTypingChange(value: string) {
@@ -197,13 +193,33 @@ export default function Conversation(props: Props) {
     }
   }
 
+  const subtitleNode = props.typingUsernames.length > 0 ? (
+    <span className="flex items-center gap-1.5">
+      <span className="flex items-center gap-0.5">
+        <span className="typing-dot h-1.5 w-1.5 rounded-full bg-wizard-green-500" />
+        <span className="typing-dot h-1.5 w-1.5 rounded-full bg-wizard-green-500" style={{ animationDelay: '0.15s' }} />
+        <span className="typing-dot h-1.5 w-1.5 rounded-full bg-wizard-green-500" style={{ animationDelay: '0.3s' }} />
+      </span>
+      {props.typingUsernames.join(', ')}
+    </span>
+  ) : chat.type === 'GROUP' ? (
+    subtitle
+  ) : online ? (
+    <span className="flex items-center gap-1.5">
+      <span className="live-dot h-2 w-2 rounded-full bg-wizard-green-500" />
+      online
+    </span>
+  ) : (
+    subtitle
+  );
+
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b border-white/5 bg-wizard-panel px-4 py-3">
+      <header className="flex items-center gap-3 border-b border-white/5 bg-wizard-panel/70 px-4 py-3 backdrop-blur-xl">
         <Avatar url={headerAvatarUrl} name={headerAvatarName} size={40} />
         <div className="min-w-0 flex-1">
           <h3 className="truncate font-semibold">{title}</h3>
-          <p className="text-xs text-wizard-muted">{subtitle}</p>
+          <p className="text-xs text-wizard-muted">{subtitleNode}</p>
         </div>
         {isGroup && props.onManageGroup && (
           <button
@@ -234,14 +250,16 @@ export default function Conversation(props: Props) {
 
         {messages.map((message) => {
           const mine = message.senderId === props.meId;
+          const failed = message.status === 'failed';
+          const pending = message.status === 'pending';
           return (
-            <div key={message.tempId ?? message.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+            <div key={message.tempId ?? message.id} className={`animate-message-in flex ${mine ? 'justify-end' : 'justify-start'}`}>
               <div
-                className={`max-w-[75%] rounded-xl px-3 py-2 text-sm shadow ${
-                  mine ? 'bg-wizard-bubble-out text-white' : 'bg-wizard-bubble-in text-wizard-text'
-                } ${message.status === 'pending' ? 'opacity-70' : ''} ${
-                  message.status === 'failed' ? 'ring-1 ring-red-400/60' : ''
-                }`}
+                className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-lg shadow-black/20 ${
+                  mine
+                    ? 'rounded-tr-md bg-gradient-to-br from-wizard-bubble-out to-wizard-green-600 text-white'
+                    : 'rounded-tl-md bg-wizard-bubble-in text-wizard-text ring-1 ring-white/5'
+                } ${pending ? 'opacity-70' : ''} ${failed ? 'ring-1 ring-red-400/60' : ''}`}
               >
                 {!mine && (
                   <p className="mb-0.5 text-xs font-semibold text-wizard-green-500">
@@ -265,10 +283,10 @@ export default function Conversation(props: Props) {
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="border-t border-white/5 bg-wizard-panel p-3">
+      <form onSubmit={handleSubmit} className="border-t border-white/5 bg-wizard-panel/70 p-3 backdrop-blur-xl">
         {attachError && <p className="mb-2 text-xs text-red-400">{attachError}</p>}
         {attachment && (
-          <div className="mb-2 flex items-center gap-2 rounded-lg border border-white/10 bg-wizard-bubble-in p-2">
+          <div className="mb-2 flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-2">
             <div className="flex items-center gap-2 overflow-hidden">
               {attachment.resourceType === 'image' && (
                 <img src={attachment.url} alt={attachment.name ?? 'preview'} className="h-12 w-12 rounded-md object-cover" />
@@ -295,7 +313,7 @@ export default function Conversation(props: Props) {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={props.composerLocked || attaching}
-            className="shrink-0 rounded-xl border border-white/10 bg-wizard-bubble-in px-3 py-2.5 text-lg leading-none text-wizard-muted transition hover:border-wizard-green-500 hover:text-wizard-text disabled:cursor-not-allowed disabled:opacity-40"
+            className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-lg leading-none text-wizard-muted transition hover:border-wizard-green-500 hover:bg-white/10 hover:text-wizard-text disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Attach a file"
             title="Attach a file"
           >
@@ -317,12 +335,12 @@ export default function Conversation(props: Props) {
             placeholder={props.composerLocked ? 'Unlock with your password to send encrypted messages' : 'Type a message'}
             maxLength={4000}
             disabled={props.composerLocked}
-            className="max-h-32 flex-1 resize-none rounded-xl border border-white/10 bg-wizard-bubble-in px-4 py-2.5 text-wizard-text outline-none transition focus:border-wizard-green-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="max-h-32 flex-1 resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-wizard-text outline-none transition placeholder:text-wizard-muted/60 focus:border-wizard-green-500 focus:bg-white/[0.07] focus:shadow-[0_0_0_4px_rgba(0,168,132,0.12)] disabled:cursor-not-allowed disabled:opacity-60"
           />
           <button
             type="submit"
             disabled={attaching || (!draft.trim() && !attachment) || props.composerLocked}
-            className="rounded-xl bg-wizard-green-600 px-4 py-2.5 font-semibold text-white transition hover:bg-wizard-green-700 disabled:opacity-40"
+            className="rounded-xl bg-gradient-to-b from-wizard-green-600 to-wizard-green-700 px-4 py-2.5 font-semibold text-white shadow-lg shadow-wizard-green-600/25 transition hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
           >
             {attaching ? 'Uploading…' : 'Send'}
           </button>

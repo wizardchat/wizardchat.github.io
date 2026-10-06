@@ -27,7 +27,7 @@ export default function UnlockBanner({ onUnlocked }: Props) {
   }
 
   return (
-    <div className="border-b border-amber-400/30 bg-amber-400/10 px-4 py-3">
+    <div className="border-b border-amber-400/25 bg-amber-400/10 px-4 py-3 backdrop-blur-xl">
       <p className="text-sm text-amber-200">
         🔒 End-to-end encrypted messages are locked on this device.
       </p>
@@ -37,13 +37,13 @@ export default function UnlockBanner({ onUnlocked }: Props) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Enter your password to unlock"
-          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-wizard-bubble-in px-3 py-2 text-sm text-wizard-text outline-none focus:border-amber-400/60"
+          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-wizard-text outline-none transition placeholder:text-amber-200/40 focus:border-amber-400/60 focus:shadow-[0_0_0_4px_rgba(251,191,36,0.12)]"
           autoFocus
         />
         <button
           type="submit"
           disabled={!password || busy}
-          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-400 disabled:opacity-40"
+          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-black shadow-lg shadow-amber-500/20 transition hover:bg-amber-400 hover:brightness-105 disabled:opacity-40"
         >
           {busy ? 'Unlocking…' : 'Unlock'}
         </button>
