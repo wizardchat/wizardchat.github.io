@@ -12,6 +12,12 @@ export type ChatRole = 'owner' | 'admin' | 'member';
 
 export type AttachmentKind = 'image' | 'video' | 'raw';
 
+export interface AttachmentPart {
+  url: string;
+  publicId: string | null;
+  size: number;
+}
+
 export interface Attachment {
   resourceType: AttachmentKind;
   url: string;
@@ -21,6 +27,8 @@ export interface Attachment {
   size: number;
   width: number | null;
   height: number | null;
+  /** Present when the file exceeded the upload cap and was sent in fragments. */
+  parts?: AttachmentPart[];
 }
 
 export interface AttachmentPreview {

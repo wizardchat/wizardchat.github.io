@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { uploadAttachment } from '../lib/upload';
+import { reassembleAttachment } from '../lib/reassemble';
 import { describeAttachment } from '../lib/chatApi';
 import type { Attachment, ChatListItem, ChatMessage } from '../lib/types';
 import Avatar from './Avatar';
@@ -54,7 +55,65 @@ function formatBytes(bytes: number): string {
   return `${(kb / 1024).toFixed(1)} MB`;
 }
 
+function SplitFileCard({ attachment, mine }: { attachment: Attachment; mine: boolean }) {
+  const [status, setStatus] = useState<
+    | { phase: 'idle' }
+    | { phase: 'downloading'; percent: number }
+    | { phase: 'error'; message: string }
+  >({ phase: 'idle' });
+
+  async function download() {
+    if (status.phase === 'downloading') return;
+    setStatus({ phase: 'downloading', percent: 0 });
+    try {
+      await reassembleAttachment(attachment, (received, total) => {
+        setStatus({ phase: 'downloading', percent: total > 0 ? Math.round((received / total) * 100) : 0 });
+      });
+      setStatus({ phase: 'idle' });
+    } catch (err) {
+      setStatus({ phase: 'error', message: err instanceof Error ? err.message : 'Could not reassemble file' });
+    }
+  }
+
+  const partCount = attachment.parts?.length ?? 0;
+
+  return (
+    <div className="mb-1 overflow-hidden rounded-lg">
+      <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+        <div className={`flex items-center gap-2 ${mine ? 'text-white' : 'text-wizard-text'}`}>
+          <span className="text-xl">📎</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold">{attachment.name ?? 'File'}</span>
+            <span className="text-xs opacity-70">
+              {formatBytes(attachment.size)}
+              {partCount > 1 ? ` · ${partCount} parts` : ''}
+            </span>
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => void download()}
+          disabled={status.phase === 'downloading'}
+          className="mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {status.phase === 'downloading'
+            ? `Combining… ${status.percent}%`
+            : status.phase === 'error'
+              ? 'Try download again'
+              : 'Download combined file'}
+        </button>
+        {status.phase === 'error' && (
+          <p className="mt-1 text-xs text-red-400">{status.message}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AttachmentCard({ attachment, mine }: { attachment: Attachment; mine: boolean }) {
+  const isSplit = (attachment.parts?.length ?? 0) >= 2;
+  if (isSplit) return <SplitFileCard attachment={attachment} mine={mine} />;
+
   const href = attachment.url;
   const content = (
     <div className={mine ? 'text-white' : 'text-wizard-text'}>

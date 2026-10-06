@@ -4,6 +4,12 @@ import { decryptMessage, encryptMessage } from './messageCrypto.js';
 
 export type AttachmentResourceType = 'image' | 'video' | 'raw';
 
+export interface AttachmentPartDescriptor {
+  url: string;
+  publicId: string | null;
+  size: number;
+}
+
 export interface AttachmentDescriptor {
   resourceType: AttachmentResourceType;
   url: string;
@@ -13,7 +19,15 @@ export interface AttachmentDescriptor {
   size: number;
   width: number | null;
   height: number | null;
+  /** Ordered fragments of a file that exceeded the per-type upload cap. */
+  parts?: AttachmentPartDescriptor[];
 }
+
+const attachmentPartSchema = z.object({
+  url: z.string().min(1).max(1024),
+  publicId: z.string().max(255).nullable().optional().default(null),
+  size: z.number().int().min(1).max(2_000_000_000),
+});
 
 export const attachmentSchema = z.object({
   resourceType: z.enum(['image', 'video', 'raw']),
@@ -24,6 +38,7 @@ export const attachmentSchema = z.object({
   size: z.number().int().min(0).max(2_000_000_000),
   width: z.number().int().min(1).max(20000).nullable().optional().default(null),
   height: z.number().int().min(1).max(20000).nullable().optional().default(null),
+  parts: z.array(attachmentPartSchema).max(256).optional().default([]),
 });
 
 export type ValidatedAttachment = z.infer<typeof attachmentSchema>;

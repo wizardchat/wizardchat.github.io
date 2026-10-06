@@ -190,11 +190,13 @@ export function attachRealtime(io: Server): void {
       let attachment: AttachmentDescriptor | null = null;
       if (body.attachment !== undefined && body.attachment !== null) {
         const parsedAttachment = attachmentSchema.safeParse(body.attachment);
-        if (!parsedAttachment.success || !isAttachmentUrlAllowed(parsedAttachment.data.url)) {
+        const descriptor = parsedAttachment.success ? parsedAttachment.data : null;
+        const urls = [descriptor?.url ?? '', ...(descriptor?.parts ?? []).map((part) => part.url)];
+        if (!descriptor || !urls.every((url) => isAttachmentUrlAllowed(url))) {
           respond({ ok: false, error: 'Invalid attachment', tempId });
           return;
         }
-        attachment = parsedAttachment.data;
+        attachment = descriptor;
       }
 
       if (!chatId || (!content && !attachment)) {
