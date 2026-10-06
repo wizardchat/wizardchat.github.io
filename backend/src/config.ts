@@ -24,15 +24,21 @@ const envSchema = z.object({
   // cloudinary://API_KEY:API_SECRET@CLOUD_NAME — enables signed file uploads.
   CLOUDINARY_URL: z.string().optional(),
   // Host allowlist for attachment/avatar URLs. Enforced only in production.
-  // A blank value (common when a Render env var is set but left empty) counts as
-  // unset so the default isn't wiped out — otherwise every attachment is rejected.
-  ALLOWED_ATTACHMENT_HOSTS: z.preprocess(
-    (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
-    z.string().default('res.cloudinary.com'),
-  ),
+  ALLOWED_ATTACHMENT_HOSTS: z.string().default('res.cloudinary.com'),
 });
 
 export const env = envSchema.parse(process.env);
+
+/**
+ * Render commonly ships empty-string env vars (a key is present but blank).
+ * zod's `.default()` only applies to *missing* keys, so a blank allowlist would
+ * silently become [] and reject every attachment. Treat blank as unset.
+ */
+export const allowedAttachmentHosts =
+  typeof env.ALLOWED_ATTACHMENT_HOSTS === 'string' &&
+  env.ALLOWED_ATTACHMENT_HOSTS.trim() !== ''
+    ? env.ALLOWED_ATTACHMENT_HOSTS
+    : 'res.cloudinary.com';
 
 export const isProduction = env.NODE_ENV === 'production';
 
@@ -69,9 +75,9 @@ export function attachmentUrlAllowed(url: string): boolean {
   }
   if (parsed.protocol !== 'https:') return false;
   if (!isProduction) return true;
-  const allowed = env.ALLOWED_ATTACHMENT_HOSTS.split(',')
-    .map((host) => host.trim().toLowerCase())
-    .filter(Boolean);
+  const normalizeHost = (raw: string): string =>
+    raw.trim().toLowerCase().replace(/^https?:\/\//, '').split(/[/:]/)[0] ?? '';
+  const allowed = allowedAttachmentHosts.split(',').map(normalizeHost).filter((host) => host !== '');
   return allowed.includes(parsed.hostname.toLowerCase());
 }
 
