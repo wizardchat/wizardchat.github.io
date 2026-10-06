@@ -28,14 +28,23 @@ function uploadRaw(
     xhr.open('POST', url);
     xhr.responseType = 'text';
     xhr.timeout = UPLOAD_TIMEOUT_MS;
+    let fullySent = false;
     if (onProgress) {
       xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) onProgress(event.loaded, event.total);
+        if (event.lengthComputable) {
+          if (event.loaded >= event.total) fullySent = true;
+          onProgress(event.loaded, event.total);
+        }
       };
     }
     xhr.onload = () => resolve({ status: xhr.status, body: xhr.responseText });
-    xhr.onerror = () => reject(new Error('Upload failed — check your connection and try again.'));
-    xhr.ontimeout = () => reject(new Error('Upload timed out — check your connection and try again.'));
+    const fail = (message: string) => {
+      const err = new Error(message) as Error & { fullySent?: boolean };
+      err.fullySent = fullySent;
+      reject(err);
+    };
+    xhr.onerror = () => fail('Upload failed — check your connection and try again.');
+    xhr.ontimeout = () => fail('Upload timed out — check your connection and try again.');
     xhr.onabort = () => reject(new Error('Upload cancelled.'));
     xhr.send(form);
   });
@@ -65,14 +74,29 @@ export async function uploadAttachment(
   form.append('signature', signature.signature);
 
   let result: { status: number; body: string };
-  try {
-    result = await uploadRaw(
-      `https://api.cloudinary.com/v1_1/${signature.cloudName}/${resourceType}/upload`,
-      form,
-      onProgress,
-    );
-  } catch (err) {
-    throw err instanceof Error ? err : new Error('Upload failed — check your connection and try again.');
+  let attempt = 1;
+  for (;;) {
+    try {
+      result = await uploadRaw(
+        `https://api.cloudinary.com/v1_1/${signature.cloudName}/${resourceType}/upload`,
+        form,
+        onProgress,
+      );
+      break;
+    } catch (err) {
+      const failed = err as Error & { fullySent?: boolean };
+      // If the whole file was transmitted but the confirmation response was
+      // lost (common on flaky/mobile links), the upload very likely persisted
+      // server-side. Retry once — worst case it leaves an orphaned asset in
+      // Cloudinary, never a message.
+      if (attempt === 1 && failed.fullySent) {
+        attempt += 1;
+        continue;
+      }
+      throw err instanceof Error
+        ? err
+        : new Error('Upload failed — check your connection and try again.');
+    }
   }
 
   if (result.status !== 200) {

@@ -98,6 +98,7 @@ export default function Conversation(props: Props) {
   const [attaching, setAttaching] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
+  const [failedFile, setFailedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -112,6 +113,7 @@ export default function Conversation(props: Props) {
     setAttachment(null);
     setAttaching(false);
     setAttachError(null);
+    setFailedFile(null);
     setDraft('');
   }, [chat?.id]);
 
@@ -159,11 +161,9 @@ export default function Conversation(props: Props) {
     }, 2000);
   }
 
-  function handlePickFile(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
+  function startUpload(file: File) {
     setAttachError(null);
+    setFailedFile(null);
     setAttaching(true);
     setUploadProgress(0);
     uploadAttachment(file, (uploaded, total) => {
@@ -175,12 +175,20 @@ export default function Conversation(props: Props) {
       })
       .catch((err: unknown) => {
         setAttachment(null);
+        setFailedFile(file);
         setAttachError(err instanceof Error ? err.message : 'Upload failed');
       })
       .finally(() => {
         setAttaching(false);
         setUploadProgress(null);
       });
+  }
+
+  function handlePickFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    startUpload(file);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -308,7 +316,21 @@ export default function Conversation(props: Props) {
       </div>
 
       <form onSubmit={handleSubmit} className="border-t border-white/5 bg-wizard-panel/70 p-3 backdrop-blur-xl">
-        {attachError && <p className="mb-2 text-xs text-red-400">{attachError}</p>}
+        {attachError && (
+          <div className="mb-2 flex items-center justify-between gap-2 text-xs text-red-400">
+            <span className="min-w-0">{attachError}</span>
+            {failedFile && (
+              <button
+                type="button"
+                onClick={() => startUpload(failedFile)}
+                disabled={attaching}
+                className="shrink-0 rounded-md border border-red-400/40 px-2 py-1 font-semibold transition hover:bg-red-400/10 disabled:opacity-40"
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        )}
         {attachment && (
           <div className="mb-2 flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-2">
             <div className="flex items-center gap-2 overflow-hidden">
