@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ChatType {
+  DIRECT
+  GROUP
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  username        String    @unique
+  passwordHash    String
+  role            Role      @default(USER)
+  banned          Boolean   @default(false)
+  e2ePublicKey    String?
+  e2eWrappedKey   String?
+  e2eKekSalt      String?
+  e2eKekParams    String?
+  e2eKeysUpdatedAt DateTime?
+  avatarUrl       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  sessions        Session[]
+  memberships     ChatMember[]
+  sentMessages    Message[]
+}
+
+model Session {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash     String    @unique
+  prevTokenHash String?   @unique
+  csrfTokenHash String
+  userAgent     String?
+  ip            String?
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  revokedReason String?
+  createdAt     DateTime  @default(now())
+  lastUsedAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Chat {
+  id        String       @id @default(cuid())
+  type      ChatType     @default(DIRECT)
+  name      String?
+  avatarUrl String?
+  createdBy String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  members   ChatMember[]
+  messages  Message[]
+}
+
+model ChatMember {
+  id          String    @id @default(cuid())
+  chatId      String
+  chat        Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        String    @default("member")
+  joinedAt    DateTime  @default(now())
+  lastReadAt  DateTime  @default(now())
+
+  @@unique([chatId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  chatId     String
+  chat       Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  ciphertext String
+  nonce      String
+  isE2ee     Boolean  @default(false)
+  attachmentCiphertext String?
+  attachmentNonce      String?
+  createdAt  DateTime @default(now())
+
+  @@index([chatId, createdAt])
+}

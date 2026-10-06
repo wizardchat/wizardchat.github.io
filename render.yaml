@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: wizardchat-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: npm ci --include=dev && npx prisma generate && npx prisma migrate deploy && npm run seed
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://wizardchat.github.io
+      - key: REFRESH_TOKEN_SECRET
+        generateValue: true
+      - key: ACCESS_TOKEN_SECRET
+        generateValue: true
+      - key: MESSAGE_ENCRYPTION_KEY
+        # Must be 64 hex chars (32 bytes). Generate with: openssl rand -hex 32
+        sync: false
+      - key: CLOUDINARY_URL
+        # cloudinary://API_KEY:API_SECRET@CLOUD_NAME — enables signed file uploads
+        # and avatars. Paste your Cloudinary dashboard credential string here.
+        sync: false
+      - key: ALLOWED_ATTACHMENT_HOSTS
+        # Hosts allowed to serve attachment/avatar URLs (production only).
+        value: res.cloudinary.com
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_USERNAME
+        value: admin
