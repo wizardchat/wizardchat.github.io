@@ -235,7 +235,7 @@ export default function Home() {
               </div>
               <div>
                 <h2 className="text-xl font-semibold">{user.username}</h2>
-                <p className="text-sm text-wizard-muted">{user.email}</p>
+                {user.email && <p className="text-sm text-wizard-muted">{user.email}</p>}
               </div>
               <span
                 className={`ml-auto rounded-full px-3 py-1 text-xs font-semibold ${

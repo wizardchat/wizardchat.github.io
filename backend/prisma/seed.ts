@@ -17,8 +17,8 @@ async function main() {
   const password = process.env.ADMIN_PASSWORD;
   const username = (process.env.ADMIN_USERNAME ?? 'admin').trim().toLowerCase();
 
-  if (!email || !password) {
-    console.info('[seed] ADMIN_EMAIL / ADMIN_PASSWORD not set — skipping admin seed');
+  if (!password) {
+    console.info('[seed] ADMIN_PASSWORD not set — skipping admin seed');
     return;
   }
 
@@ -29,7 +29,7 @@ async function main() {
   }
 
   const existing = await prisma.user.findFirst({
-    where: { OR: [{ email }, { username }] },
+    where: { OR: [{ username }, ...(email ? [{ email }] : [])] },
   });
 
   if (existing) {
@@ -44,9 +44,11 @@ async function main() {
 
   const passwordHash = await hash(password, ARGON2_OPTIONS);
   const user = await prisma.user.create({
-    data: { email, username, passwordHash, role: 'ADMIN' },
+    data: { username, ...(email ? { email } : {}), passwordHash, role: 'ADMIN' },
   });
-  console.info(`[seed] Created admin user ${user.username} (${user.email})`);
+  console.info(
+    `[seed] Created admin user ${user.username}${email ? ` (${email})` : ' (no email)'}`,
+  );
 }
 
 main()

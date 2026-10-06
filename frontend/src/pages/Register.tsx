@@ -72,14 +72,14 @@ export default function Register() {
 
           <div>
             <label htmlFor="email" className="mb-1.5 block text-sm text-wizard-muted">
-              Email
+              Email <span className="text-wizard-green-500">(optional)</span>
             </label>
             <input
               id="email"
               type="email"
               autoComplete="email"
-              required
               maxLength={254}
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className={inputClass}

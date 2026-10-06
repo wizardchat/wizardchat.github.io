@@ -1,7 +1,7 @@
 export interface User {
   id: string;
   username: string;
-  email: string;
+  email: string | null;
   role: 'USER' | 'ADMIN';
   banned: boolean;
   avatarUrl: string | null;

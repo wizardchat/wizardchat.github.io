@@ -5,7 +5,7 @@ import { verifyAccessToken } from '../lib/tokens.js';
 export interface AuthUser {
   id: string;
   username: string;
-  email: string;
+  email: string | null;
   role: 'USER' | 'ADMIN';
   banned: boolean;
   avatarUrl: string | null;

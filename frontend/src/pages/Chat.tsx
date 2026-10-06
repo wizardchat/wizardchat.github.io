@@ -644,7 +644,7 @@ export default function Chat() {
               )}
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{user.username}</p>
-                <p className="truncate text-xs text-wizard-muted">{user.email}</p>
+                {user.email && <p className="truncate text-xs text-wizard-muted">{user.email}</p>}
               </div>
             </div>
             <button

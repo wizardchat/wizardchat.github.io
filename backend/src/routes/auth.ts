@@ -28,7 +28,7 @@ const registerSchema = z.object({
     .min(3)
     .max(20)
     .regex(/^[a-zA-Z0-9_]+$/, 'Username may only contain letters, numbers, and underscores'),
-  email: z.email().max(254),
+  email: z.union([z.literal(''), z.email().max(254)]).optional(),
   password: z.string().min(8).max(128),
 });
 
@@ -81,10 +81,11 @@ authRouter.post('/register', authLimiter, async (req, res) => {
   }
 
   const username = parsed.data.username.toLowerCase();
-  const email = parsed.data.email.toLowerCase();
+  const emailRaw = parsed.data.email?.trim();
+  const email = emailRaw ? emailRaw.toLowerCase() : null;
 
   const existing = await prisma.user.findFirst({
-    where: { OR: [{ email }, { username }] },
+    where: { OR: [{ username }, ...(email ? [{ email }] : [])] },
     select: { id: true },
   });
   if (existing) {
