@@ -21,7 +21,7 @@ export const attachmentSchema = z.object({
   publicId: z.string().max(255).nullable().optional().default(null),
   name: z.string().max(255).nullable().optional().default(null),
   mime: z.string().max(120).nullable().optional().default(null),
-  size: z.number().int().min(0).max(20_000_000),
+  size: z.number().int().min(0).max(2_000_000_000),
   width: z.number().int().min(1).max(20000).nullable().optional().default(null),
   height: z.number().int().min(1).max(20000).nullable().optional().default(null),
 });

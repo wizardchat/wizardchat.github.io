@@ -77,14 +77,11 @@ function AttachmentCard({ attachment, mine }: { attachment: Attachment; mine: bo
     </div>
   );
 
-  const inner =
-    attachment.resourceType === 'raw' ? (
-      content
-    ) : (
-      <a href={href} target="_blank" rel="noreferrer noopener">
-        {content}
-      </a>
-    );
+  const inner = (
+    <a href={href} target="_blank" rel="noreferrer noopener">
+      {content}
+    </a>
+  );
 
   return <div className="mb-1 overflow-hidden rounded-lg">{inner}</div>;
 }
@@ -336,7 +333,7 @@ export default function Conversation(props: Props) {
             type="file"
             className="hidden"
             onChange={handlePickFile}
-            accept="image/*,video/*,application/pdf,text/plain,.csv,.zip"
+            accept="*/*"
             data-testid="attachment-input"
           />
           <textarea

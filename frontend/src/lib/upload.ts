@@ -1,8 +1,6 @@
 import { ApiError, getUploadSignature } from './chatApi';
 import type { Attachment, AttachmentKind } from './types';
 
-const MAX_UPLOAD_BYTES = 20_000_000;
-
 function resourceTypeFor(file: File): AttachmentKind {
   if (file.type.startsWith('image/')) return 'image';
   if (file.type.startsWith('video/')) return 'video';
@@ -21,10 +19,6 @@ function signatureError(err: unknown): string {
  * directly to Cloudinary. The API secret never touches this client.
  */
 export async function uploadAttachment(file: File): Promise<Attachment> {
-  if (file.size > MAX_UPLOAD_BYTES) {
-    throw new Error(`File is too large (max 20 MB)`);
-  }
-
   const resourceType = resourceTypeFor(file);
   let signature: Awaited<ReturnType<typeof getUploadSignature>>;
   try {
@@ -53,8 +47,9 @@ export async function uploadAttachment(file: File): Promise<Attachment> {
   if (!res.ok) {
     let message = `Upload failed (${res.status})`;
     try {
-      const body = (await res.json()) as { error?: { message?: string } };
-      if (body.error?.message) message = body.error.message;
+      const body = (await res.json()) as { error?: { message?: string } | string };
+      if (typeof body.error === 'string') message = body.error;
+      else if (body.error?.message) message = body.error.message;
     } catch {
       /* keep default message */
     }
