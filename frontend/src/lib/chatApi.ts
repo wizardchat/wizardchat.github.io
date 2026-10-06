@@ -1,4 +1,4 @@
-import type { ChatListItem, ChatMemberInfo, ChatMessage, ChatRole, ChatSummary, User } from './types';
+import type { AdminUser, AdminUserMessage, ChatListItem, ChatMemberInfo, ChatMessage, ChatRole, ChatSummary, User } from './types';
 
 const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 const CSRF_STORAGE_KEY = 'wizardchat.csrf';
@@ -327,4 +327,63 @@ export async function fetchMessages(
 
 export async function markChatRead(chatId: string): Promise<{ readAt: string }> {
   return request(`/chats/${encodeURIComponent(chatId)}/read`, { method: 'POST' });
+}
+
+export async function adminListUsers(
+  q: string,
+  limit: number,
+  offset: number,
+): Promise<{ users: AdminUser[]; total: number }> {
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
+  return request(`/admin/users?${params.toString()}`);
+}
+
+export async function adminUpdateUser(
+  userId: string,
+  patch: { banned?: boolean; role?: 'USER' | 'ADMIN' },
+): Promise<AdminUser> {
+  const data = await request<{ user: AdminUser }>(`/admin/users/${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+  return data.user;
+}
+
+export async function adminDeleteUser(userId: string): Promise<{ username: string }> {
+  const data = await request<{ deletedUser: { username: string } }>(
+    `/admin/users/${encodeURIComponent(userId)}`,
+    { method: 'DELETE' },
+  );
+  return data.deletedUser;
+}
+
+export async function adminResetPassword(userId: string): Promise<{ username: string; tempPassword: string }> {
+  return request(`/admin/users/${encodeURIComponent(userId)}/reset-password`, { method: 'POST' });
+}
+
+export async function adminListUserMessages(
+  userId: string,
+  limit = 50,
+): Promise<AdminUserMessage[]> {
+  const data = await request<{ messages: AdminUserMessage[] }>(
+    `/admin/users/${encodeURIComponent(userId)}/messages?limit=${limit}`,
+  );
+  return data.messages;
+}
+
+export async function adminDeleteUserMessage(userId: string, messageId: string): Promise<void> {
+  await request(`/admin/users/${encodeURIComponent(userId)}/messages/${encodeURIComponent(messageId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function adminClearUserMessages(userId: string): Promise<number> {
+  const data = await request<{ deleted: number }>(
+    `/admin/users/${encodeURIComponent(userId)}/messages`,
+    { method: 'DELETE' },
+  );
+  return data.deleted;
 }

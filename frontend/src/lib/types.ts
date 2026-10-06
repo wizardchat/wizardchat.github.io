@@ -79,3 +79,23 @@ export interface ChatSummary {
   members: ChatMemberInfo[];
   myRole: ChatRole | null;
 }
+
+export interface AdminUser {
+  id: string;
+  username: string;
+  email: string | null;
+  role: 'USER' | 'ADMIN';
+  banned: boolean;
+  avatarUrl: string | null;
+  createdAt: string;
+  messageCount: number;
+  activeSessions: number;
+}
+
+export interface AdminUserMessage {
+  id: string;
+  chatId: string;
+  isE2ee: boolean;
+  preview: string | null;
+  createdAt: string;
+}

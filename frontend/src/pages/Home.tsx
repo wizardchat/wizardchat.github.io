@@ -250,6 +250,14 @@ export default function Home() {
               <Link to="/" className="text-wizard-green-500 hover:underline">
                 Open your chats →
               </Link>
+              {user.role === 'ADMIN' && (
+                <>
+                  {' '}·{' '}
+                  <Link to="/admin" className="text-amber-400 hover:underline">
+                    Admin panel →
+                  </Link>
+                </>
+              )}
             </p>
           </section>
         ) : (

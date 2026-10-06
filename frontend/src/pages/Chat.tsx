@@ -296,6 +296,14 @@ export default function Chat() {
       setPresence((prev) => ({ ...prev, [payload.userId]: payload.online }));
     };
 
+    const onMessagesDeleted = (payload: { chatId: string; messageIds: string[] }) => {
+      setMessages((prev) => {
+        const ids = new Set(payload.messageIds);
+        const next = prev.filter((m) => !ids.has(m.id));
+        return next.length === prev.length ? prev : next;
+      });
+    };
+
     socket.on('message:new', onMessageNew);
     socket.on('chat:updated', onChatUpdated);
     socket.on('chat:new', onChatNew);
@@ -304,6 +312,7 @@ export default function Chat() {
     socket.on('typing', onTyping);
     socket.on('messages:read', onMessagesRead);
     socket.on('presence:update', onPresence);
+    socket.on('messages:deleted', onMessagesDeleted);
     socket.on('connect', () => {
       const active = activeChatRef.current;
       if (active) {
@@ -328,6 +337,7 @@ export default function Chat() {
       socket.off('typing', onTyping);
       socket.off('messages:read', onMessagesRead);
       socket.off('presence:update', onPresence);
+      socket.off('messages:deleted', onMessagesDeleted);
       socket.off('connect');
     };
   }, [user, refreshChats]);

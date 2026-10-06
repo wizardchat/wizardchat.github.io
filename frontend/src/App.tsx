@@ -1,6 +1,7 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './lib/auth';
 import { AuthProvider } from './lib/auth';
+import Admin from './pages/Admin';
 import Chat from './pages/Chat';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -25,6 +26,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/home" element={<Home />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="*" element={<Navigate to="/" replace />} />
