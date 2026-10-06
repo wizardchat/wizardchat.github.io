@@ -24,7 +24,12 @@ const envSchema = z.object({
   // cloudinary://API_KEY:API_SECRET@CLOUD_NAME — enables signed file uploads.
   CLOUDINARY_URL: z.string().optional(),
   // Host allowlist for attachment/avatar URLs. Enforced only in production.
-  ALLOWED_ATTACHMENT_HOSTS: z.string().default('res.cloudinary.com'),
+  // A blank value (common when a Render env var is set but left empty) counts as
+  // unset so the default isn't wiped out — otherwise every attachment is rejected.
+  ALLOWED_ATTACHMENT_HOSTS: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+    z.string().default('res.cloudinary.com'),
+  ),
 });
 
 export const env = envSchema.parse(process.env);
