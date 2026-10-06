@@ -47,6 +47,13 @@ function ticksFor(message: ChatMessage, props: Props): ReactNode {
   return <span className="text-xs text-wizard-muted">✓</span>;
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} KB`;
+  return `${(kb / 1024).toFixed(1)} MB`;
+}
+
 function AttachmentCard({ attachment, mine }: { attachment: Attachment; mine: boolean }) {
   const href = attachment.url;
   const content = (
@@ -67,9 +74,7 @@ function AttachmentCard({ attachment, mine }: { attachment: Attachment; mine: bo
           <span className="min-w-0">
             <span className="block truncate text-sm font-semibold">{attachment.name ?? 'File'}</span>
             {attachment.size > 0 && (
-              <span className="text-xs opacity-70">
-                {(attachment.size / 1024 / 1024).toFixed(1)} MB
-              </span>
+              <span className="text-xs opacity-70">{formatBytes(attachment.size)}</span>
             )}
           </span>
         </div>
@@ -91,6 +96,7 @@ export default function Conversation(props: Props) {
   const [draft, setDraft] = useState('');
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [attaching, setAttaching] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -159,13 +165,22 @@ export default function Conversation(props: Props) {
     if (!file) return;
     setAttachError(null);
     setAttaching(true);
-    uploadAttachment(file)
-      .then((result) => setAttachment(result))
+    setUploadProgress(0);
+    uploadAttachment(file, (uploaded, total) => {
+      setUploadProgress(total > 0 ? Math.round((uploaded / total) * 100) : null);
+    })
+      .then((result) => {
+        setAttachment(result);
+        setAttachError(null);
+      })
       .catch((err: unknown) => {
         setAttachment(null);
         setAttachError(err instanceof Error ? err.message : 'Upload failed');
       })
-      .finally(() => setAttaching(false));
+      .finally(() => {
+        setAttaching(false);
+        setUploadProgress(null);
+      });
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -351,7 +366,11 @@ export default function Conversation(props: Props) {
             disabled={attaching || (!draft.trim() && !attachment) || props.composerLocked}
             className="rounded-xl bg-gradient-to-b from-wizard-green-600 to-wizard-green-700 px-4 py-2.5 font-semibold text-white shadow-lg shadow-wizard-green-600/25 transition hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
           >
-            {attaching ? 'Uploading…' : 'Send'}
+            {attaching
+              ? uploadProgress !== null
+                ? `Uploading ${uploadProgress}%…`
+                : 'Uploading…'
+              : 'Send'}
           </button>
         </div>
       </form>
