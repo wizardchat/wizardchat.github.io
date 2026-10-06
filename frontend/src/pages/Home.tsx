@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { getApiUrl } from '../lib/chatApi';
 import { useAuth } from '../lib/auth';
+import SessionNotice from '../components/SessionNotice';
 
 type Status = 'checking' | 'online' | 'degraded' | 'offline';
 
@@ -204,6 +205,7 @@ export default function Home() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12">
+      <SessionNotice />
       <header className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-wizard-green-500 to-wizard-green-700 text-2xl font-extrabold text-white shadow-lg shadow-wizard-green-500/25 ring-1 ring-white/10">

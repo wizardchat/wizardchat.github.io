@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import SessionNotice from '../components/SessionNotice';
 import { useAuth } from '../lib/auth';
 
 export default function Login() {
@@ -27,6 +28,7 @@ export default function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-md">
+        <SessionNotice />
         <div className="mb-8 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-wizard-green-500 to-wizard-green-700 text-2xl font-extrabold text-white shadow-lg shadow-wizard-green-500/25 ring-1 ring-white/10">
             W

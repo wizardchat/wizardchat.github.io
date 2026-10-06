@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import {
@@ -160,21 +160,45 @@ export default function Admin() {
   }, []);
 
   const load = useCallback(
-    async (nextOffset = offset, q = query) => {
+    async (nextOffset = offset, q = query, silent = false) => {
       setBusy(true);
       try {
         const data = await adminListUsers(q, PAGE_SIZE, nextOffset);
+        if (silent && data.users.length === 0 && data.total > 0) {
+          // Never blank the table just because a paginated search missed on a
+          // background refresh — keep whatever we have on screen.
+          setBusy(false);
+          return;
+        }
         setUsers(data.users);
         setTotal(data.total);
         setOffset(nextOffset);
       } catch (err) {
-        show(err instanceof Error ? err.message : 'Failed to load users', 'err');
+        if (!silent) show(err instanceof Error ? err.message : 'Failed to load users', 'err');
       } finally {
         setBusy(false);
       }
     },
     [offset, query, show],
   );
+
+  // Silent auto-refresh while the tab is open and focused, so actions taken by
+  // other admins (or elsewhere) show up without a manual reload.
+  const busyRef = useRef(false);
+  const loadRef = useRef(load);
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
+  useEffect(() => {
+    loadRef.current = load;
+  }, [load]);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (busyRef.current || !document.hasFocus()) return;
+      loadRef.current(offset, query, true);
+    }, 15000);
+    return () => window.clearInterval(id);
+  }, [offset, query]);
 
   useEffect(() => {
     void load(0, '');

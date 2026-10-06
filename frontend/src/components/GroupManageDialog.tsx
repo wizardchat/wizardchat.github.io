@@ -145,7 +145,12 @@ export default function GroupManageDialog({ chat, meId, onClose, onChanged }: Pr
       setAvatarUrl(updated.avatarUrl ?? null);
       onChanged(chat.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update group picture');
+      const msg = err instanceof Error ? err.message : 'Failed to update group picture';
+      setError(
+        msg === 'Invalid group update' || msg === 'URL is not allowed'
+          ? `The server rejected that picture: ${msg}`
+          : msg,
+      );
     } finally {
       setAvatarUploading(false);
     }

@@ -66,7 +66,7 @@ async function decryptHistory(
 }
 
 export default function Chat() {
-  const { user, logout, e2eState, updateProfile } = useAuth();
+  const { user, logout, e2eState, updateProfile, forceLogout, refreshMe } = useAuth();
   const [chats, setChats] = useState<ChatListItem[]>([]);
   const [activeChat, setActiveChat] = useState<ChatListItem | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -115,7 +115,7 @@ export default function Chat() {
     } catch {
       // Non-fatal; user can retry.
     }
-  }, [user]);
+  }, [user?.id]);
 
   const sendWithSocket = useCallback((tempId: string, chatId: string, wire: SendWire) => {
     const socket = getSocket();
@@ -304,6 +304,23 @@ export default function Chat() {
       });
     };
 
+    const onAccountUpdated = (payload: { userId: string; banned?: boolean; role?: 'USER' | 'ADMIN' }) => {
+      if (payload.userId !== user.id) return;
+      if (payload.banned === true) {
+        void forceLogout('Your account was blocked by an admin');
+        return;
+      }
+      if (payload.role !== undefined) void refreshMe();
+    };
+
+    const onAccountDeleted = () => {
+      void forceLogout('Your account was deleted by an admin');
+    };
+
+    const onAccountLocked = () => {
+      void forceLogout('Your password was reset by an admin — please sign in again');
+    };
+
     socket.on('message:new', onMessageNew);
     socket.on('chat:updated', onChatUpdated);
     socket.on('chat:new', onChatNew);
@@ -313,6 +330,9 @@ export default function Chat() {
     socket.on('messages:read', onMessagesRead);
     socket.on('presence:update', onPresence);
     socket.on('messages:deleted', onMessagesDeleted);
+    socket.on('account:updated', onAccountUpdated);
+    socket.on('account:deleted', onAccountDeleted);
+    socket.on('account:locked', onAccountLocked);
     socket.on('connect', () => {
       const active = activeChatRef.current;
       if (active) {
@@ -338,9 +358,12 @@ export default function Chat() {
       socket.off('messages:read', onMessagesRead);
       socket.off('presence:update', onPresence);
       socket.off('messages:deleted', onMessagesDeleted);
+      socket.off('account:updated', onAccountUpdated);
+      socket.off('account:deleted', onAccountDeleted);
+      socket.off('account:locked', onAccountLocked);
       socket.off('connect');
     };
-  }, [user, refreshChats]);
+  }, [user?.id, refreshChats, forceLogout, refreshMe]);
 
   useEffect(() => {
     if (user) void refreshChats();
@@ -606,15 +629,21 @@ export default function Chat() {
   const composerLocked = activeChat?.type === 'DIRECT' && e2eState !== 'ready';
 
   return (
-    <div className="flex h-screen">
-      <aside className="w-80 shrink-0 border-r border-white/5 bg-wizard-panel/80 backdrop-blur-xl">
-        <ChatList
-          chats={chats}
-          activeChatId={activeChat?.id ?? null}
-          meId={user.id}
-          onSelect={(chat) => void handleSelectChat(chat)}
-          onNewChat={() => setNewChatOpen(true)}
-        />
+    <div className="flex h-dvh overflow-hidden">
+      <aside
+        className={`${
+          activeChat ? 'hidden md:flex' : 'flex'
+        } w-full shrink-0 flex-col bg-wizard-panel/80 md:w-80 md:border-r md:border-white/5 md:backdrop-blur-xl`}
+      >
+        <div className="flex min-h-0 flex-1 flex-col">
+          <ChatList
+            chats={chats}
+            activeChatId={activeChat?.id ?? null}
+            meId={user.id}
+            onSelect={(chat) => void handleSelectChat(chat)}
+            onNewChat={() => setNewChatOpen(true)}
+          />
+        </div>
         <div className="border-t border-white/5 px-4 py-3">
           {avatarError && <p className="mb-2 text-xs text-red-400">{avatarError}</p>}
           <div className="flex items-center justify-between gap-3">
@@ -668,7 +697,7 @@ export default function Chat() {
         </div>
       </aside>
 
-      <main className="flex min-w-0 flex-1 flex-col">
+      <main className={`${activeChat ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col`}>
         {e2eState === 'locked' && (
           <UnlockBanner
             onUnlocked={() => {
@@ -694,6 +723,7 @@ export default function Chat() {
             onTyping={handleTyping}
             onRead={handleRead}
             onManageGroup={activeChat?.type === 'GROUP' ? () => setManageChatId(activeChat.id) : undefined}
+            onBack={() => setActiveChat(null)}
           />
         </div>
       </main>

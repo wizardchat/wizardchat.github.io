@@ -133,6 +133,14 @@ adminRouter.patch('/users/:id', async (req, res) => {
     select: adminUserSelect,
   });
 
+  if (Object.keys(data).length > 0) {
+    ioFrom(req)?.to(`user:${id}`).emit('account:updated', {
+      userId: id,
+      ...(data.banned !== undefined ? { banned: data.banned } : {}),
+      ...(data.role !== undefined ? { role: data.role } : {}),
+    });
+  }
+
   console.warn(
     `[admin] ${req.user?.username ?? 'unknown'} updated ${updated.username}: ${Object.keys(data).join(', ')}`,
   );
@@ -170,6 +178,8 @@ adminRouter.delete('/users/:id', async (req, res) => {
     }
     await tx.user.delete({ where: { id } });
   });
+
+  ioFrom(req)?.to(`user:${id}`).emit('account:deleted', { userId: id });
 
   console.warn(`[admin] ${req.user?.username ?? 'unknown'} deleted user ${user.username}`);
 
@@ -293,6 +303,8 @@ adminRouter.post('/users/:id/reset-password', async (req, res) => {
       data: { revokedAt: new Date(), revokedReason: 'admin_reset' },
     }),
   ]);
+
+  ioFrom(req)?.to(`user:${user.id}`).emit('account:locked', { userId: user.id });
 
   console.warn(`[admin] ${admin?.username ?? 'unknown'} reset password for ${user.username}`);
 

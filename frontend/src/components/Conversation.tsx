@@ -19,6 +19,7 @@ interface Props {
   onTyping: (isTyping: boolean) => void;
   onRead: () => void;
   onManageGroup?: () => void;
+  onBack?: () => void;
 }
 
 function ticksFor(message: ChatMessage, props: Props): ReactNode {
@@ -215,7 +216,18 @@ export default function Conversation(props: Props) {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b border-white/5 bg-wizard-panel/70 px-4 py-3 backdrop-blur-xl">
+      <header className="flex items-center gap-1 border-b border-white/5 bg-wizard-panel/70 px-3 py-3 backdrop-blur-xl sm:gap-3 sm:px-4">
+        {props.onBack && (
+          <button
+            type="button"
+            onClick={props.onBack}
+            className="shrink-0 rounded-lg px-2 py-1.5 text-lg leading-none text-wizard-muted transition hover:bg-wizard-hover hover:text-wizard-text md:hidden"
+            aria-label="Back to chats"
+            title="Back to chats"
+          >
+            ←
+          </button>
+        )}
         <Avatar url={headerAvatarUrl} name={headerAvatarName} size={40} />
         <div className="min-w-0 flex-1">
           <h3 className="truncate font-semibold">{title}</h3>

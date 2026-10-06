@@ -26,9 +26,13 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   e2eState: E2eState;
+  accountNotice: string | null;
+  clearAccountNotice: () => void;
   login: (identifier: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  forceLogout: (reason: string) => Promise<void>;
+  refreshMe: () => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   unlockE2EE: (password: string) => Promise<boolean>;
   updateProfile: (patch: { avatarUrl: string | null }) => Promise<void>;
@@ -40,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [e2eState, setE2eState] = useState<E2eState>('loading');
+  const [accountNotice, setAccountNotice] = useState<string | null>(null);
   const userRef = useRef<User | null>(null);
 
   useEffect(() => {
@@ -163,6 +168,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setE2eState('loading');
   }, []);
 
+  const forceLogout = useCallback(async (reason: string) => {
+    disconnectSocket();
+    const current = userRef.current;
+    try {
+      await api.logout();
+    } catch {
+      api.clearSessionTokens();
+    }
+    if (current) clearIdentity(current.id);
+    setUser(null);
+    setE2eState('loading');
+    setAccountNotice(reason);
+  }, []);
+
+  const refreshMe = useCallback(async () => {
+    const me = await api.fetchMe();
+    setUser(me);
+  }, []);
+
+  const clearAccountNotice = useCallback(() => setAccountNotice(null), []);
+
+  // Periodically re-check the account on every page. This makes admin actions
+  // (ban, role change, delete, password reset) take effect without a manual
+  // reload: a banned/deleted user is signed out wherever they are, and a
+  // promoted user sees their new role immediately.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const timer = window.setInterval(async () => {
+      if (cancelled) return;
+      try {
+        const me = await api.fetchMe();
+        if (!cancelled) setUser(me);
+      } catch (err) {
+        if (cancelled) return;
+        const status = err instanceof api.ApiError ? err.status : 0;
+        if (status === 403) {
+          void forceLogout('Your account was suspended or locked by an admin');
+        } else if (status === 404) {
+          void forceLogout('Your account was deleted by an admin');
+        } else if (status === 401) {
+          void forceLogout('Your session was ended — please sign in again');
+        }
+      }
+    }, 30000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [user, forceLogout]);
+
   const unlockE2EE = useCallback(async (password: string) => {
     const current = userRef.current;
     if (!current) return false;
@@ -230,8 +286,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, e2eState, login, register, logout, changePassword, unlockE2EE, updateProfile }),
-    [user, loading, e2eState, login, register, logout, changePassword, unlockE2EE, updateProfile],
+    () => ({
+      user,
+      loading,
+      e2eState,
+      accountNotice,
+      clearAccountNotice,
+      login,
+      register,
+      logout,
+      forceLogout,
+      refreshMe,
+      changePassword,
+      unlockE2EE,
+      updateProfile,
+    }),
+    [
+      user,
+      loading,
+      e2eState,
+      accountNotice,
+      clearAccountNotice,
+      login,
+      register,
+      logout,
+      forceLogout,
+      refreshMe,
+      changePassword,
+      unlockE2EE,
+      updateProfile,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
