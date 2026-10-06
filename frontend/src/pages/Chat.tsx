@@ -9,6 +9,7 @@ import { useAuth } from '../lib/auth';
 import {
   createDirectChat,
   createGroup,
+  fetchChat,
   fetchMessages,
   getAccessToken,
   listChats,
@@ -80,6 +81,20 @@ export default function Chat() {
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [manageChatId, setManageChatId] = useState<string | null>(null);
   const [sendQueue, setSendQueue] = useState<(SendWire & { tempId: string; chatId: string })[]>([]);
+  const [sendNotice, setSendNotice] = useState<string | null>(null);
+  const sendNoticeTimerRef = useRef<number | null>(null);
+
+  const showSendNotice = useCallback((message: string) => {
+    setSendNotice(message);
+    if (sendNoticeTimerRef.current !== null) window.clearTimeout(sendNoticeTimerRef.current);
+    sendNoticeTimerRef.current = window.setTimeout(() => setSendNotice(null), 8000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (sendNoticeTimerRef.current !== null) window.clearTimeout(sendNoticeTimerRef.current);
+    };
+  }, []);
 
   const activeChatRef = useRef<ChatListItem | null>(null);
   const chatsRef = useRef<ChatListItem[]>([]);
@@ -133,11 +148,12 @@ export default function Chat() {
           setMessages((prev) =>
             prev.map((m) => (m.tempId === tempId ? { ...m, status: 'failed' as const } : m)),
           );
+          if (!res.ok && res.error) showSendNotice(res.error === 'Chat unavailable' ? 'This chat is unavailable right now' : res.error);
         }
       },
     );
     return true;
-  }, []);
+  }, [showSendNotice]);
 
   // Connect socket when authenticated
   useEffect(() => {
@@ -489,8 +505,30 @@ export default function Chat() {
       if (isE2ee) {
         const identity = loadIdentity(user.id);
         const other = chat.members.find((m) => m.userId !== user.id);
-        if (!identity || !other?.e2ePublicKey) {
+        if (!identity) {
           fail();
+          showSendNotice('End-to-end encryption is locked on this device — unlock with your password first.');
+          return;
+        }
+        let recipientKey = other?.e2ePublicKey ?? null;
+        try {
+          const fresh = await fetchChat(chat.id);
+          const freshOther = fresh.members.find((m) => m.userId !== user.id);
+          const freshKey = freshOther?.e2ePublicKey ?? null;
+          if (freshKey) recipientKey = freshKey;
+          // Cache the freshest member list so public-key rotations (e.g. after a
+          // password reset) are picked up by later sends in this session.
+          setChats((prev) =>
+            prev.map((c) => (c.id === chat.id ? { ...c, members: fresh.members } : c)),
+          );
+        } catch {
+          // Network blip — fall back to the cached key.
+        }
+        if (!recipientKey) {
+          fail();
+          showSendNotice(
+            `End-to-end encryption isn't available with ${other?.username ?? 'this person'} yet — they need to sign in to their account once to set it up.`,
+          );
           return;
         }
         try {
@@ -498,11 +536,12 @@ export default function Chat() {
             chatId: chat.id,
             senderId: user.id,
             myIdentity: identity,
-            recipientPublicKey: other.e2ePublicKey,
+            recipientPublicKey: recipientKey,
           });
           wire = { content: encrypted.ciphertext, nonce: encrypted.nonce, isE2ee: true, attachment };
         } catch {
           fail();
+          showSendNotice('Could not encrypt this message — please try again.');
           return;
         }
       }
@@ -706,6 +745,14 @@ export default function Chat() {
               if (active) void handleSelectChat(active);
             }}
           />
+        )}
+        {sendNotice && (
+          <div
+            role="status"
+            className="border-b border-amber-400/25 bg-amber-500/10 px-4 py-2 text-sm text-amber-200 backdrop-blur-xl"
+          >
+            {sendNotice}
+          </div>
         )}
         <div className="min-h-0 flex-1">
           <Conversation
