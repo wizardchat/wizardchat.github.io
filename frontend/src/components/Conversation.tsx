@@ -452,24 +452,6 @@ export default function Conversation(props: Props) {
             ←
           </button>
         )}
-        {props.onOpenDashboard && (
-          <button
-            type="button"
-            onClick={props.onOpenDashboard}
-            className="group relative shrink-0 transition hover:opacity-80"
-            title="Open dashboard"
-            aria-label="Open dashboard"
-          >
-            {props.dashboardIcon ? (
-              <img src={props.dashboardIcon} alt="" className="h-10 w-10 rounded-xl object-cover ring-1 ring-white/10" />
-            ) : (
-              <Avatar url={chat.avatarUrl} name={title} size={40} className="rounded-xl bg-wizard-panel" />
-            )}
-            <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-md bg-wizard-green-600 text-[9px] leading-none text-white ring-2 ring-wizard-panel group-hover:bg-wizard-green-500">
-              ▤
-            </span>
-          </button>
-        )}
         <Avatar url={headerAvatarUrl} name={headerAvatarName} size={40} />
         <div className="min-w-0 flex-1">
           <h3 className="truncate font-semibold">{title}</h3>
@@ -488,19 +470,40 @@ export default function Conversation(props: Props) {
         )}
       </header>
 
-      <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
-        {props.hasMore && (
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={props.onLoadOlder}
-              disabled={props.loadingHistory}
-              className="rounded-full border border-white/10 px-4 py-1 text-xs text-wizard-muted transition hover:border-wizard-green-500 hover:text-wizard-text disabled:opacity-50"
-            >
-              {props.loadingHistory ? 'Loading…' : 'Load earlier messages'}
-            </button>
-          </div>
+      <div className="relative min-h-0 flex-1">
+        {props.onOpenDashboard && (
+          <button
+            type="button"
+            onClick={props.onOpenDashboard}
+            className="absolute right-3 top-2 z-20 flex h-8 w-8 items-center justify-center transition hover:opacity-70"
+            title="Open dashboard"
+            aria-label="Open dashboard"
+          >
+            {props.dashboardIcon ? (
+              <img src={props.dashboardIcon} alt="" className="h-8 w-8 object-contain" />
+            ) : (
+              <svg viewBox="0 0 24 24" className="h-7 w-7 text-wizard-muted" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="6" rx="1.5" />
+                <rect x="3" y="14" width="18" height="6" rx="1.5" />
+                <circle cx="7" cy="7" r=".6" fill="currentColor" />
+                <circle cx="7" cy="17" r=".6" fill="currentColor" />
+              </svg>
+            )}
+          </button>
         )}
+        <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
+          {props.hasMore && (
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={props.onLoadOlder}
+                disabled={props.loadingHistory}
+                className="rounded-full border border-white/10 px-4 py-1 text-xs text-wizard-muted transition hover:border-wizard-green-500 hover:text-wizard-text disabled:opacity-50"
+              >
+                {props.loadingHistory ? 'Loading…' : 'Load earlier messages'}
+              </button>
+            </div>
+          )}
 
         {messages.map((message) => {
           const mine = message.senderId === props.meId;
@@ -576,6 +579,7 @@ export default function Conversation(props: Props) {
           );
         })}
         <div ref={bottomRef} />
+      </div>
       </div>
 
       <form onSubmit={handleSubmit} className="border-t border-white/5 bg-wizard-panel/70 p-3 backdrop-blur-xl">
