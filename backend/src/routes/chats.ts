@@ -20,10 +20,13 @@ import { requireAuth } from '../middleware/auth.js';
 import { encryptMessage } from '../lib/messageCrypto.js';
 import { decryptAttachment } from '../lib/attachments.js';
 import { attachmentDestroyCandidates, destroyCloudinaryAssets } from '../lib/mediaCleanup.js';
+import { dashboardRouter } from './dashboard.js';
 
 export const chatsRouter = Router();
 
 chatsRouter.use(requireAuth);
+
+chatsRouter.use('/:id/dashboard', dashboardRouter);
 
 const memberInclude = {
   members: {

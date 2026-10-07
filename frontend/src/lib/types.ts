@@ -90,6 +90,63 @@ export interface ChatSummary {
   myRole: ChatRole | null;
 }
 
+export type DashboardRowKind = 'text' | 'status' | 'button';
+
+export interface DashboardTextRow {
+  kind: 'text';
+  id: string;
+  text: string;
+}
+
+export interface DashboardStatusRow {
+  kind: 'status';
+  id: string;
+  label?: string | null;
+  url: string;
+  jsonPath?: string | null;
+  refreshSec?: number | null;
+}
+
+export interface DashboardButtonRow {
+  kind: 'button';
+  id: string;
+  label: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  url: string;
+  headers: Record<string, string>;
+  body?: string | null;
+  confirm?: string | null;
+}
+
+export type DashboardRow = DashboardTextRow | DashboardStatusRow | DashboardButtonRow;
+
+export interface DashboardSection {
+  id: string;
+  title?: string | null;
+  rows: DashboardRow[];
+}
+
+export interface DashboardConfig {
+  sections: DashboardSection[];
+}
+
+export interface ChatDashboard {
+  iconUrl: string | null;
+  updatedBy: string | null;
+  updatedAt: string | null;
+  blocks: DashboardConfig;
+  canEdit: boolean;
+}
+
+export interface DashboardRunResult {
+  ok: boolean;
+  status: number | null;
+  error?: string | null;
+  value?: string | null;
+  raw?: string | null;
+  text?: string | null;
+}
+
 export interface AdminUser {
   id: string;
   username: string;

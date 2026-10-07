@@ -67,6 +67,17 @@ model Chat {
   updatedAt DateTime     @updatedAt
   members   ChatMember[]
   messages  Message[]
+  dashboard ChatDashboard?
+}
+
+model ChatDashboard {
+  chatId      String   @id
+  chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  iconUrl     String?
+  blocks      Json
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model PushSubscription {

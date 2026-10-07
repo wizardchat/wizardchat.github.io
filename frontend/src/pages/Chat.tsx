@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Avatar from '../components/Avatar';
 import ChatList from '../components/ChatList';
 import Conversation from '../components/Conversation';
+import DashboardPanel from '../components/DashboardPanel';
 import GroupManageDialog from '../components/GroupManageDialog';
 import NewChatDialog from '../components/NewChatDialog';
 import UnlockBanner from '../components/UnlockBanner';
@@ -18,6 +19,7 @@ import {
   listChats,
   markChatRead,
 } from '../lib/chatApi';
+import { getDashboard } from '../lib/dashboardApi';
 import { decryptChatMessage, encryptMessage, loadIdentity, LOCKED_PLACEHOLDER } from '../lib/e2ee';
 import { enablePush, getPushPreference } from '../lib/push';
 import { uploadAttachment } from '../lib/upload';
@@ -85,6 +87,8 @@ export default function Chat() {
   const [readCutoffs, setReadCutoffs] = useState<Record<string, string>>({});
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [manageChatId, setManageChatId] = useState<string | null>(null);
+  const [dashboardChatId, setDashboardChatId] = useState<string | null>(null);
+  const [dashIcon, setDashIcon] = useState<Record<string, string | null>>({});
   const [sendQueue, setSendQueue] = useState<(SendWire & { tempId: string; chatId: string })[]>([]);
   const [sendNotice, setSendNotice] = useState<string | null>(null);
   const sendNoticeTimerRef = useRef<number | null>(null);
@@ -514,6 +518,23 @@ export default function Chat() {
     })();
   }, [user, handleSelectChat]);
 
+  // Load the dashboard icon for the active group chat so the header chip can show it.
+  useEffect(() => {
+    const chat = activeChat;
+    if (!chat || chat.type !== 'GROUP') return;
+    let cancelled = false;
+    void getDashboard(chat.id)
+      .then(({ dashboard }) => {
+        if (!cancelled) setDashIcon((prev) => ({ ...prev, [chat.id]: dashboard.iconUrl }));
+      })
+      .catch(() => {
+        if (!cancelled) setDashIcon((prev) => ({ ...prev, [chat.id]: null }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeChat]);
+
   const handleLoadOlder = useCallback(async () => {
     const chat = activeChatRef.current;
     const oldest = messages[0];
@@ -919,6 +940,8 @@ export default function Chat() {
             onEditMessage={handleEditMessage}
             onDeleteMessage={handleDeleteMessage}
             onManageGroup={activeChat?.type === 'GROUP' ? () => setManageChatId(activeChat.id) : undefined}
+            dashboardIcon={activeChat?.type === 'GROUP' ? dashIcon[activeChat.id] ?? null : null}
+            onOpenDashboard={activeChat?.type === 'GROUP' ? () => setDashboardChatId(activeChat.id) : undefined}
             onBack={() => setActiveChat(null)}
           />
         </div>
@@ -940,6 +963,21 @@ export default function Chat() {
           onChanged={(chatId, opts) => void handleGroupChanged(chatId, opts)}
         />
       )}
+
+      {dashboardChatId &&
+        (() => {
+          const dashChat = chats.find((c) => c.id === dashboardChatId);
+          if (!dashChat || dashChat.type !== 'GROUP') return null;
+          return (
+            <DashboardPanel
+              chatId={dashChat.id}
+              chatName={dashChat.name ?? 'Group chat'}
+              canEdit={dashChat.myRole === 'owner' || dashChat.myRole === 'admin'}
+              onClose={() => setDashboardChatId(null)}
+              onSavedIcon={(iconUrl) => setDashIcon((prev) => ({ ...prev, [dashChat.id]: iconUrl }))}
+            />
+          );
+        })()}
     </div>
   );
 }

@@ -24,6 +24,8 @@ interface Props {
   onDeleteMessage?: (message: ChatMessage) => Promise<void>;
   onManageGroup?: () => void;
   onBack?: () => void;
+  dashboardIcon?: string | null;
+  onOpenDashboard?: () => void;
 }
 
 function ticksFor(message: ChatMessage, props: Props): ReactNode {
@@ -448,6 +450,24 @@ export default function Conversation(props: Props) {
             title="Back to chats"
           >
             ←
+          </button>
+        )}
+        {props.onOpenDashboard && (
+          <button
+            type="button"
+            onClick={props.onOpenDashboard}
+            className="group relative shrink-0 transition hover:opacity-80"
+            title="Open dashboard"
+            aria-label="Open dashboard"
+          >
+            {props.dashboardIcon ? (
+              <img src={props.dashboardIcon} alt="" className="h-10 w-10 rounded-xl object-cover ring-1 ring-white/10" />
+            ) : (
+              <Avatar url={chat.avatarUrl} name={title} size={40} className="rounded-xl bg-wizard-panel" />
+            )}
+            <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-md bg-wizard-green-600 text-[9px] leading-none text-white ring-2 ring-wizard-panel group-hover:bg-wizard-green-500">
+              ▤
+            </span>
           </button>
         )}
         <Avatar url={headerAvatarUrl} name={headerAvatarName} size={40} />
