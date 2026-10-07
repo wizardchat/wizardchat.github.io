@@ -491,7 +491,7 @@ export default function Conversation(props: Props) {
             )}
           </button>
         )}
-        <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
+        <div className="absolute inset-0 space-y-2 overflow-y-auto px-4 pb-4 pt-4">
           {props.hasMore && (
             <div className="text-center">
               <button
@@ -579,7 +579,7 @@ export default function Conversation(props: Props) {
           );
         })}
         <div ref={bottomRef} />
-      </div>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="border-t border-white/5 bg-wizard-panel/70 p-3 backdrop-blur-xl">
