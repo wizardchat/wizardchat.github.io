@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Avatar from '../components/Avatar';
 import ChatList from '../components/ChatList';
 import Conversation from '../components/Conversation';
@@ -9,6 +10,8 @@ import { useAuth } from '../lib/auth';
 import {
   createDirectChat,
   createGroup,
+  deleteMessage,
+  editMessage,
   fetchChat,
   fetchMessages,
   getAccessToken,
@@ -16,6 +19,7 @@ import {
   markChatRead,
 } from '../lib/chatApi';
 import { decryptChatMessage, encryptMessage, loadIdentity, LOCKED_PLACEHOLDER } from '../lib/e2ee';
+import { enablePush, getPushPreference } from '../lib/push';
 import { uploadAttachment } from '../lib/upload';
 import { connectSocket, disconnectSocket, getSocket } from '../lib/socket';
 import type { Attachment, AttachmentPreview, ChatListItem, ChatMemberInfo, ChatMessage } from '../lib/types';
@@ -67,6 +71,7 @@ async function decryptHistory(
 }
 
 export default function Chat() {
+  const navigate = useNavigate();
   const { user, logout, e2eState, updateProfile, forceLogout, refreshMe } = useAuth();
   const [chats, setChats] = useState<ChatListItem[]>([]);
   const [activeChat, setActiveChat] = useState<ChatListItem | null>(null);
@@ -337,6 +342,30 @@ export default function Chat() {
       void forceLogout('Your password was reset by an admin — please sign in again');
     };
 
+    const onMessagesUpdated = async (payload: { chatId: string; message: ChatMessage }) => {
+      let updated = payload.message;
+      if (updated.isE2ee) {
+        const members =
+          chatsRef.current.find((c) => c.id === payload.chatId)?.members ??
+          (activeChatRef.current?.id === payload.chatId ? activeChatRef.current.members : null);
+        if (members) {
+          updated = { ...updated, content: await decryptChatMessage(updated, members, user.id) };
+        } else {
+          updated = { ...updated, content: LOCKED_PLACEHOLDER };
+        }
+      }
+      setMessages((prev) =>
+        prev.map((m) => (m.id === updated.id ? { ...updated, status: m.status === 'failed' ? 'failed' : m.status } : m)),
+      );
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === payload.chatId && c.lastMessage?.id === updated.id
+            ? { ...c, lastMessage: { ...c.lastMessage, content: updated.content, editedAt: updated.editedAt ?? null } }
+            : c,
+        ),
+      );
+    };
+
     socket.on('message:new', onMessageNew);
     socket.on('chat:updated', onChatUpdated);
     socket.on('chat:new', onChatNew);
@@ -346,6 +375,7 @@ export default function Chat() {
     socket.on('messages:read', onMessagesRead);
     socket.on('presence:update', onPresence);
     socket.on('messages:deleted', onMessagesDeleted);
+    socket.on('messages:updated', onMessagesUpdated);
     socket.on('account:updated', onAccountUpdated);
     socket.on('account:deleted', onAccountDeleted);
     socket.on('account:locked', onAccountLocked);
@@ -374,6 +404,7 @@ export default function Chat() {
       socket.off('messages:read', onMessagesRead);
       socket.off('presence:update', onPresence);
       socket.off('messages:deleted', onMessagesDeleted);
+      socket.off('messages:updated', onMessagesUpdated);
       socket.off('account:updated', onAccountUpdated);
       socket.off('account:deleted', onAccountDeleted);
       socket.off('account:locked', onAccountLocked);
@@ -457,6 +488,31 @@ export default function Chat() {
     },
     [user?.id],
   );
+
+  // Ask for notification permission + subscribe once per signed-in session —
+  // but respect the user's preference set on the settings page.
+  useEffect(() => {
+    if (!user) return;
+    if (getPushPreference()) void enablePush();
+  }, [user]);
+
+  // Deep-link from a notification click: `#/?pushchat=<chatId>` selects that chat.
+  useEffect(() => {
+    if (!user) return;
+    void (async () => {
+      const params = new URLSearchParams((window.location.hash.split('?')[1] ?? '').toString());
+      const chatId = params.get('pushchat');
+      if (!chatId) return;
+      const base = window.location.hash.split('?')[0] || '#/';
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${base}`);
+      for (let i = 0; i < 40; i += 1) {
+        if (chatsRef.current.some((c) => c.id === chatId)) break;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      const target = chatsRef.current.find((c) => c.id === chatId) ?? null;
+      if (target) void handleSelectChat(target);
+    })();
+  }, [user, handleSelectChat]);
 
   const handleLoadOlder = useCallback(async () => {
     const chat = activeChatRef.current;
@@ -559,6 +615,88 @@ export default function Chat() {
     if (!chat || !socket?.connected) return;
     socket.emit('typing', { chatId: chat.id, isTyping });
   }, []);
+
+  const handleEditMessage = useCallback(
+    async (message: ChatMessage, newText: string) => {
+      const chat = activeChatRef.current;
+      if (!chat || !user) throw new Error('No active chat.');
+      const caption = newText.trim();
+      if (!caption) throw new Error('Message cannot be empty.');
+      if (message.tempId || message.status === 'pending') {
+        throw new Error('Wait for this message to send before editing.');
+      }
+
+      const revert = () =>
+        setMessages((prev) =>
+          prev.map((m) => (m.id === message.id || m.tempId === message.id ? message : m)),
+        );
+
+      // Optimistically mirror the edited text in our own view.
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === message.id ? { ...m, content: caption, editedAt: new Date().toISOString() } : m,
+        ),
+      );
+
+      let wire: SendWire = { content: caption, nonce: null, isE2ee: false };
+      if (message.isE2ee) {
+        const identity = loadIdentity(user.id);
+        const other = chat.members.find((m) => m.userId !== user.id);
+        if (!identity || !other) {
+          revert();
+          throw new Error('End-to-end encryption is locked on this device — unlock with your password first.');
+        }
+        let recipientKey = other.e2ePublicKey ?? null;
+        try {
+          const fresh = await fetchChat(chat.id);
+          const freshOther = fresh.members.find((m) => m.userId !== user.id);
+          const freshKey = freshOther?.e2ePublicKey ?? null;
+          if (freshKey) recipientKey = freshKey;
+          setChats((prev) =>
+            prev.map((c) => (c.id === chat.id ? { ...c, members: fresh.members } : c)),
+          );
+        } catch {
+          // Network blip — fall back to the cached key.
+        }
+        if (!recipientKey) {
+          revert();
+          throw new Error(`End-to-end encryption isn't available with ${other.username} yet.`);
+        }
+        try {
+          const encrypted = await encryptMessage(caption, {
+            chatId: chat.id,
+            senderId: user.id,
+            myIdentity: identity,
+            recipientPublicKey: recipientKey,
+          });
+          wire = { content: encrypted.ciphertext, nonce: encrypted.nonce, isE2ee: true };
+        } catch {
+          revert();
+          throw new Error('Could not encrypt this message — please try again.');
+        }
+      }
+
+      try {
+        await editMessage(chat.id, message.id, wire);
+      } catch (err) {
+        revert();
+        throw err;
+      }
+    },
+    [user],
+  );
+
+  const handleDeleteMessage = useCallback(
+    async (message: ChatMessage) => {
+      const chat = activeChatRef.current;
+      if (!chat || !user) return;
+      if (message.tempId || message.status === 'pending') return;
+      await deleteMessage(chat.id, message.id);
+      setMessages((prev) => prev.filter((m) => m.id !== message.id));
+      void refreshChats();
+    },
+    [user, refreshChats],
+  );
 
   const handleRead = useCallback(() => {
     const chat = activeChatRef.current;
@@ -727,6 +865,15 @@ export default function Chat() {
             </div>
             <button
               type="button"
+              onClick={() => navigate('/settings')}
+              className="shrink-0 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-wizard-muted transition hover:border-wizard-green-500/50 hover:bg-wizard-green-500/10 hover:text-wizard-green-400"
+              title="Settings"
+              aria-label="Open settings"
+            >
+              ⚙️
+            </button>
+            <button
+              type="button"
               onClick={() => void logout()}
               className="shrink-0 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-wizard-muted transition hover:border-red-400/50 hover:bg-red-500/10 hover:text-red-400"
             >
@@ -769,6 +916,8 @@ export default function Chat() {
             onSend={handleSend}
             onTyping={handleTyping}
             onRead={handleRead}
+            onEditMessage={handleEditMessage}
+            onDeleteMessage={handleDeleteMessage}
             onManageGroup={activeChat?.type === 'GROUP' ? () => setManageChatId(activeChat.id) : undefined}
             onBack={() => setActiveChat(null)}
           />

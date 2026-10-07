@@ -18,6 +18,7 @@ import {
   wrapIdentity,
 } from './e2ee';
 import { disconnectSocket, updateSocketToken } from './socket';
+import { disablePush } from './push';
 import type { User } from './types';
 
 type E2eState = 'loading' | 'ready' | 'locked';
@@ -161,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     disconnectSocket();
+    void disablePush();
     const current = userRef.current;
     await api.logout();
     if (current) clearIdentity(current.id);
@@ -170,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const forceLogout = useCallback(async (reason: string) => {
     disconnectSocket();
+    void disablePush();
     const current = userRef.current;
     try {
       await api.logout();
