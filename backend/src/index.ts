@@ -2,7 +2,10 @@ import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { createApp } from './app.js';
 import { corsOrigins, env } from './config.js';
+import { initPush } from './lib/push.js';
 import { attachRealtime } from './realtime/socket.js';
+
+initPush();
 
 const app = createApp();
 const httpServer = createServer(app);

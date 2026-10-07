@@ -8,6 +8,7 @@ import { adminRouter } from './routes/admin.js';
 import { authRouter } from './routes/auth.js';
 import { chatsRouter } from './routes/chats.js';
 import { healthRouter } from './routes/health.js';
+import { pushRouter } from './routes/push.js';
 import { uploadsRouter } from './routes/uploads.js';
 import { usersRouter } from './routes/users.js';
 
@@ -39,6 +40,7 @@ export function createApp() {
   app.use('/auth', authRouter);
   app.use('/users', usersRouter);
   app.use('/chats', chatsRouter);
+  app.use('/push', pushRouter);
   app.use('/uploads', uploadsRouter);
   app.use('/admin', adminRouter);
 

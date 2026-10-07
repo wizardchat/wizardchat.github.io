@@ -14,6 +14,7 @@ import {
   type AttachmentDescriptor,
 } from '../lib/attachments.js';
 import { encryptMessage } from '../lib/messageCrypto.js';
+import { notifyUsersViaPush } from '../lib/push.js';
 import { verifyAccessToken } from '../lib/tokens.js';
 import { isProduction } from '../config.js';
 
@@ -265,6 +266,26 @@ export function attachRealtime(io: Server): void {
       const outgoing = { ...serialized, tempId };
 
       io.to(`chat:${chatId}`).emit('message:new', outgoing);
+
+      const recipients = chat.members.map((m) => m.userId).filter((id) => id !== user.id);
+      if (recipients.length > 0) {
+        const chatName = chat.type === 'GROUP' ? (chat.name ?? 'Group chat') : null;
+        const title = chat.type === 'DIRECT' ? user.username : `${user.username} in ${chatName}`;
+        let body = 'New message';
+        if (attachment?.name) {
+          body = `📎 ${attachment.name}`;
+        } else if (!isE2ee && content) {
+          body = content.length > 120 ? `${content.slice(0, 120)}…` : content;
+        } else if (isE2ee) {
+          body = 'New encrypted message';
+        }
+        void notifyUsersViaPush(io, chat.id, recipients, {
+          title,
+          body,
+          chatId,
+          url: `/#/?pushchat=${encodeURIComponent(chatId)}`,
+        });
+      }
 
       const lastMessage = lastMessagePreview(serialized);
       for (const member of chat.members) {

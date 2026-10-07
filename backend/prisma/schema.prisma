@@ -35,6 +35,7 @@ model User {
   sessions        Session[]
   memberships     ChatMember[]
   sentMessages    Message[]
+  pushSubscriptions PushSubscription[]
 }
 
 model Session {
@@ -68,6 +69,18 @@ model Chat {
   messages  Message[]
 }
 
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  keysP256dh String
+  keysAuth  String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
 model ChatMember {
   id          String    @id @default(cuid())
   chatId      String
@@ -94,6 +107,7 @@ model Message {
   attachmentCiphertext String?
   attachmentNonce      String?
   createdAt  DateTime @default(now())
+  editedAt   DateTime?
 
   @@index([chatId, createdAt])
 }

@@ -25,6 +25,10 @@ const envSchema = z.object({
   CLOUDINARY_URL: z.string().optional(),
   // Host allowlist for attachment/avatar URLs. Enforced only in production.
   ALLOWED_ATTACHMENT_HOSTS: z.string().default('res.cloudinary.com'),
+  // Web Push VAPID keys (https://web-push lib). Optional — push is disabled when absent.
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);
@@ -82,3 +86,22 @@ export function attachmentUrlAllowed(url: string): boolean {
 }
 
 export const REFRESH_COOKIE_NAME = 'wc_rt';
+
+export interface VapidConfig {
+  publicKey: string;
+  privateKey: string;
+  subject: string;
+}
+
+const nonEmpty = (value: string | undefined): string | null =>
+  typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+
+export const vapidConfig: VapidConfig | null = (() => {
+  const publicKey = nonEmpty(env.VAPID_PUBLIC_KEY);
+  const privateKey = nonEmpty(env.VAPID_PRIVATE_KEY);
+  const subject = nonEmpty(env.VAPID_SUBJECT) ?? 'mailto:admin@wizardchat.app';
+  if (!publicKey || !privateKey) return null;
+  return { publicKey, privateKey, subject };
+})();
+
+export const pushEnabled = vapidConfig !== null;

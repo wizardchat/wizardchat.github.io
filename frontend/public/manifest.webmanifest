@@ -1,0 +1,22 @@
+{
+  "name": "WizardChat",
+  "short_name": "WizardChat",
+  "description": "WizardChat — secure, end-to-end encrypted messaging",
+  "start_url": "/#/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b141a",
+  "theme_color": "#075e54",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-192.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
