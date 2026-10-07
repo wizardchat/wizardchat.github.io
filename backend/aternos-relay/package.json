@@ -1,0 +1,17 @@
+{
+  "name": "wizardchat-aternos-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tiny self-hosted relay so a group dashboard can read Aternos status and start/stop the server.",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@rifaichump/aternos": "^1.6.0"
+  }
+}
