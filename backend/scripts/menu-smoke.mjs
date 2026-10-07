@@ -91,7 +91,6 @@ async function main() {
   const aTok = regAlice.data.accessToken;
   const bTok = regBob.data.accessToken;
   const cTok = regCarol.data.accessToken;
-  const aId = regAlice.data.user.id;
   const bId = regBob.data.user.id;
 
   const dm = await api('/chats/direct', { method: 'POST', token: aTok, body: { userId: bId } });

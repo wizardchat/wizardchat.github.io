@@ -29,6 +29,14 @@ export default tseslint.config(
     },
   },
   {
+    files: ['frontend/public/**'],
+    languageOptions: {
+      globals: {
+        ...globals.serviceworker,
+      },
+    },
+  },
+  {
     rules: {
       '@typescript-eslint/no-unused-vars': [
         'error',

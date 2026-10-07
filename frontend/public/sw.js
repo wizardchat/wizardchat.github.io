@@ -8,7 +8,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let data = null;
+  let data;
   try {
     data = event.data ? event.data.json() : null;
   } catch {
