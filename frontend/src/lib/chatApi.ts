@@ -329,6 +329,51 @@ export async function markChatRead(chatId: string): Promise<{ readAt: string }> 
   return request(`/chats/${encodeURIComponent(chatId)}/read`, { method: 'POST' });
 }
 
+export async function editMessage(
+  chatId: string,
+  messageId: string,
+  payload: { content: string; nonce?: string | null; isE2ee: boolean },
+): Promise<{ ok: boolean; message: ChatMessage }> {
+  return request(`/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ...payload, nonce: payload.nonce ?? undefined }),
+  });
+}
+
+export async function deleteMessage(chatId: string, messageId: string): Promise<{ ok: boolean }> {
+  return request(`/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function fetchVapidPublicKey(): Promise<string | null> {
+  const data = await request<{ publicKey: string | null }>('/push/vapid-public-key');
+  return data.publicKey;
+}
+
+export interface PushSubscriptionBody {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}
+
+export async function pushSubscribe(subscription: PushSubscriptionBody): Promise<void> {
+  await request<{ ok: boolean }>('/push/subscribe', {
+    method: 'POST',
+    body: JSON.stringify(subscription),
+  });
+}
+
+export async function pushUnsubscribe(endpoint: string): Promise<void> {
+  try {
+    await request<{ ok: boolean }>('/push/subscribe', {
+      method: 'DELETE',
+      body: JSON.stringify({ endpoint }),
+    });
+  } catch {
+    // Best-effort; the backend prunes dead endpoints on delivery failure anyway.
+  }
+}
+
 export async function adminListUsers(
   q: string,
   limit: number,

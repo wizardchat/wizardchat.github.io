@@ -17,6 +17,9 @@ import {
 } from '../lib/chat.js';
 import { attachmentUrlAllowed } from '../config.js';
 import { requireAuth } from '../middleware/auth.js';
+import { encryptMessage } from '../lib/messageCrypto.js';
+import { decryptAttachment } from '../lib/attachments.js';
+import { attachmentDestroyCandidates, destroyCloudinaryAssets } from '../lib/mediaCleanup.js';
 
 export const chatsRouter = Router();
 
@@ -604,6 +607,172 @@ chatsRouter.get('/:id/messages', async (req, res) => {
       .filter((m) => m.userId !== me.id)
       .map((m) => ({ userId: m.userId, lastReadAt: m.lastReadAt.toISOString() })),
   });
+});
+
+const editMessageBodySchema = z.object({
+  content: z.string().min(1),
+  nonce: z.string().optional().default(''),
+  isE2ee: z.boolean().optional().default(false),
+});
+
+function canModifyMessage(
+  chat: ChatWithMembers,
+  meId: string,
+  message: { senderId: string },
+): boolean {
+  if (message.senderId === meId) return true;
+  if (chat.type !== 'GROUP') return false;
+  const role = memberRole(chat, meId);
+  return role === 'owner' || role === 'admin';
+}
+
+chatsRouter.delete('/:id/messages/:messageId', async (req, res) => {
+  const me = req.user;
+  if (!me) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+
+  const chat = await getChatWithMembership(req.params.id, me.id);
+  if (!chat) {
+    res.status(404).json({ error: 'Chat not found' });
+    return;
+  }
+  if (chat.members.some((m) => m.user.banned)) {
+    res.status(403).json({ error: 'Chat unavailable' });
+    return;
+  }
+
+  const message = await prisma.message.findFirst({
+    where: { id: req.params.messageId, chatId: chat.id },
+    include: messageInclude,
+  });
+  if (!message) {
+    res.status(404).json({ error: 'Message not found' });
+    return;
+  }
+  if (!canModifyMessage(chat, me.id, message)) {
+    res.status(403).json({ error: 'You cannot delete this message' });
+    return;
+  }
+
+  // Best-effort: also remove the Cloudinary asset(s) if we can decrypt the descriptor.
+  const attachment = decryptAttachment({
+    ciphertext: message.attachmentCiphertext,
+    nonce: message.attachmentNonce,
+  });
+  if (attachment) {
+    void destroyCloudinaryAssets(attachmentDestroyCandidates(attachment));
+  }
+
+  await prisma.message.delete({ where: { id: message.id } });
+  ioFrom(req)?.to(`chat:${chat.id}`).emit('messages:deleted', {
+    chatId: chat.id,
+    messageIds: [message.id],
+  });
+
+  const last = await prisma.message.findFirst({
+    where: { chatId: chat.id },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    include: messageInclude,
+  });
+  const now = new Date();
+  const lastPreview = last ? lastMessagePreview(serializeMessage(last)) : null;
+  for (const member of chat.members) {
+    ioFrom(req)?.to(`user:${member.userId}`).emit('chat:updated', {
+      chatId: chat.id,
+      lastMessage: lastPreview,
+      updatedAt: now.toISOString(),
+    });
+  }
+
+  res.json({ ok: true, messageId: message.id });
+});
+
+chatsRouter.patch('/:id/messages/:messageId', async (req, res) => {
+  const me = req.user;
+  if (!me) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+
+  const chat = await getChatWithMembership(req.params.id, me.id);
+  if (!chat) {
+    res.status(404).json({ error: 'Chat not found' });
+    return;
+  }
+  if (chat.members.some((m) => m.user.banned)) {
+    res.status(403).json({ error: 'Chat unavailable' });
+    return;
+  }
+
+  const message = await prisma.message.findFirst({
+    where: { id: req.params.messageId, chatId: chat.id },
+    include: messageInclude,
+  });
+  if (!message) {
+    res.status(404).json({ error: 'Message not found' });
+    return;
+  }
+  if (!canModifyMessage(chat, me.id, message)) {
+    res.status(403).json({ error: 'You cannot edit this message' });
+    return;
+  }
+
+  const parsed = editMessageBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid input' });
+    return;
+  }
+
+  const isE2ee = parsed.data.isE2ee;
+  let ciphertext: string;
+  let storedNonce: string;
+  if (isE2ee) {
+    if (chat.type !== 'DIRECT') {
+      res.status(400).json({ error: 'End-to-end encryption is only available in direct chats' });
+      return;
+    }
+    const content = parsed.data.content;
+    const ctBuf = Buffer.from(content, 'base64');
+    const ivBuf = Buffer.from(parsed.data.nonce, 'base64');
+    if (ctBuf.toString('base64') !== content || ctBuf.length < 17 || ctBuf.length > 16016) {
+      res.status(400).json({ error: 'Invalid encrypted payload' });
+      return;
+    }
+    if (ivBuf.length !== 12 || ivBuf.toString('base64') !== parsed.data.nonce) {
+      res.status(400).json({ error: 'Invalid encryption nonce' });
+      return;
+    }
+    ciphertext = content;
+    storedNonce = parsed.data.nonce;
+  } else {
+    const content = parsed.data.content.trim();
+    if (!content) {
+      res.status(400).json({ error: 'Message cannot be empty' });
+      return;
+    }
+    if (content.length > MAX_MESSAGE_LENGTH) {
+      res.status(400).json({ error: `Message too long (max ${MAX_MESSAGE_LENGTH})` });
+      return;
+    }
+    const encrypted = encryptMessage(content);
+    ciphertext = encrypted.ciphertext;
+    storedNonce = encrypted.nonce;
+  }
+
+  const updated = await prisma.message.update({
+    where: { id: message.id },
+    data: { ciphertext, nonce: storedNonce, isE2ee, editedAt: new Date() },
+    include: messageInclude,
+  });
+  const serialized = serializeMessage(updated);
+  ioFrom(req)?.to(`chat:${chat.id}`).emit('messages:updated', {
+    chatId: chat.id,
+    message: serialized,
+  });
+
+  res.json({ ok: true, message: serialized });
 });
 
 chatsRouter.post('/:id/read', async (req, res) => {

@@ -61,6 +61,7 @@ export interface ChatListItem {
     nonce: string | null;
     attachment: AttachmentPreview | null;
     createdAt: string;
+    editedAt?: string | null;
   } | null;
   unreadCount: number;
 }
@@ -75,6 +76,7 @@ export interface ChatMessage {
   nonce: string | null;
   attachment: Attachment | null;
   createdAt: string;
+  editedAt?: string | null;
   tempId?: string;
   status?: 'pending' | 'sent' | 'failed';
 }

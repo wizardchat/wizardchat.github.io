@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { uploadAttachment } from '../lib/upload';
 import { reassembleAttachment } from '../lib/reassemble';
 import { describeAttachment } from '../lib/chatApi';
+import { downloadUrl } from '../lib/download';
 import type { Attachment, ChatListItem, ChatMessage } from '../lib/types';
 import Avatar from './Avatar';
 
@@ -19,6 +20,8 @@ interface Props {
   onSend: (content: string, attachment?: Attachment) => Promise<void>;
   onTyping: (isTyping: boolean) => void;
   onRead: () => void;
+  onEditMessage?: (message: ChatMessage, newText: string) => Promise<void>;
+  onDeleteMessage?: (message: ChatMessage) => Promise<void>;
   onManageGroup?: () => void;
   onBack?: () => void;
 }
@@ -92,7 +95,10 @@ function SplitFileCard({ attachment, mine }: { attachment: Attachment; mine: boo
         </div>
         <button
           type="button"
-          onClick={() => void download()}
+          onClick={(e) => {
+            e.stopPropagation();
+            void download();
+          }}
           disabled={status.phase === 'downloading'}
           className="mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -163,6 +169,15 @@ export default function Conversation(props: Props) {
   const typingTimeoutRef = useRef<number | null>(null);
   const lastReadChatRef = useRef<string | null>(null);
 
+  const [bubbleMenu, setBubbleMenu] = useState<{ message: ChatMessage; x: number; y: number } | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimerRef = useRef<number | null>(null);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages.length, chat?.id]);
@@ -174,6 +189,10 @@ export default function Conversation(props: Props) {
     setAttachError(null);
     setFailedFile(null);
     setDraft('');
+    setBubbleMenu(null);
+    setConfirmDeleteId(null);
+    setEditingId(null);
+    setEditError(null);
   }, [chat?.id]);
 
   useEffect(() => {
@@ -273,6 +292,130 @@ export default function Conversation(props: Props) {
     }
   }
 
+  function flashNotice(text: string) {
+    setNotice(text);
+    if (noticeTimerRef.current !== null) {
+      window.clearTimeout(noticeTimerRef.current);
+    }
+    noticeTimerRef.current = window.setTimeout(() => setNotice(null), 4000);
+  }
+
+  function canModify(message: ChatMessage): boolean {
+    if (message.senderId === props.meId) return true;
+    return chat!.type === 'GROUP' && (chat!.myRole === 'owner' || chat!.myRole === 'admin');
+  }
+
+  function openBubbleMenu(message: ChatMessage, e: ReactMouseEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    const sel = window.getSelection();
+    if (sel && sel.toString().trim().length > 0) return;
+    setConfirmDeleteId(null);
+    setBubbleMenu({ message, x: e.clientX, y: e.clientY });
+  }
+
+  function menuPositionStyle(): CSSProperties {
+    if (!bubbleMenu) return { left: 0, top: 0 };
+    const menuWidth = 208;
+    const rows = 1 + (bubbleMenu.message.attachment ? 1 : 0) + (canModify(bubbleMenu.message) ? 2 : 0);
+    const height = rows * 38 + 8 + (confirmDeleteId === bubbleMenu.message.id ? 72 : 0);
+    let left = bubbleMenu.x - menuWidth + 28;
+    left = Math.max(8, Math.min(left, window.innerWidth - menuWidth - 8));
+    let top = bubbleMenu.y + 10;
+    if (top + height > window.innerHeight - 8) top = bubbleMenu.y - height - 10;
+    top = Math.max(8, top);
+    return { left, top };
+  }
+
+  async function copyMessage(message: ChatMessage) {
+    let text = message.content ?? '';
+    if (message.attachment) {
+      const name = message.attachment.name ?? 'File';
+      text = `${text ? `${text}\n` : ''}${name} — ${message.attachment.url}`;
+    }
+    if (text) {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+        } catch {
+          // Ignore — no way to surface clipboard failures silently.
+        }
+        ta.remove();
+      }
+    }
+    setBubbleMenu(null);
+    flashNotice('Copied to clipboard.');
+  }
+
+  async function downloadMessage(message: ChatMessage) {
+    const attachment = message.attachment;
+    if (!attachment) return;
+    setBubbleMenu(null);
+    try {
+      if ((attachment.parts?.length ?? 0) >= 2) {
+        await reassembleAttachment(attachment);
+      } else {
+        await downloadUrl(attachment.url, attachment.name ?? 'File');
+      }
+      flashNotice('Download started.');
+    } catch (err) {
+      flashNotice(err instanceof Error ? err.message : 'Could not download this file.');
+    }
+  }
+
+  function startEdit(message: ChatMessage) {
+    setEditingId(message.id);
+    setEditDraft(message.content ?? '');
+    setEditError(null);
+    setBubbleMenu(null);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditError(null);
+  }
+
+  async function saveEdit(message: ChatMessage) {
+    if (editing || !editDraft.trim()) return;
+    setEditing(true);
+    setEditError(null);
+    try {
+      await props.onEditMessage?.(message, editDraft);
+      setEditingId(null);
+      setEditDraft('');
+      flashNotice('Message updated.');
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Could not edit this message.');
+    } finally {
+      setEditing(false);
+    }
+  }
+
+  async function confirmDelete() {
+    const message = bubbleMenu?.message;
+    if (!message) return;
+    if (confirmDeleteId !== message.id) {
+      setConfirmDeleteId(message.id);
+      return;
+    }
+    setBubbleMenu(null);
+    setConfirmDeleteId(null);
+    try {
+      await props.onDeleteMessage?.(message);
+      flashNotice('Message deleted.');
+    } catch (err) {
+      flashNotice(err instanceof Error ? err.message : 'Could not delete this message.');
+    }
+  }
+
   const subtitleNode = props.typingUsernames.length > 0 ? (
     <span className="flex items-center gap-1.5">
       <span className="flex items-center gap-0.5">
@@ -294,7 +437,7 @@ export default function Conversation(props: Props) {
   );
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       <header className="flex items-center gap-1 border-b border-white/5 bg-wizard-panel/70 px-3 py-3 backdrop-blur-xl sm:gap-3 sm:px-4">
         {props.onBack && (
           <button
@@ -343,14 +486,16 @@ export default function Conversation(props: Props) {
           const mine = message.senderId === props.meId;
           const failed = message.status === 'failed';
           const pending = message.status === 'pending';
+          const editingThis = editingId === message.id;
           return (
             <div key={message.tempId ?? message.id} className={`animate-message-in flex ${mine ? 'justify-end' : 'justify-start'}`}>
               <div
-                className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-lg shadow-black/20 ${
+                className={`max-w-[75%] cursor-default rounded-2xl px-3 py-2 text-sm shadow-lg shadow-black/20 select-none ${
                   mine
                     ? 'rounded-tr-md bg-gradient-to-br from-wizard-bubble-out to-wizard-green-600 text-white'
                     : 'rounded-tl-md bg-wizard-bubble-in text-wizard-text ring-1 ring-white/5'
                 } ${pending ? 'opacity-70' : ''} ${failed ? 'ring-1 ring-red-400/60' : ''}`}
+                onClick={(e) => openBubbleMenu(message, e)}
               >
                 {!mine && (
                   <p className="mb-0.5 text-xs font-semibold text-wizard-green-500">
@@ -358,13 +503,52 @@ export default function Conversation(props: Props) {
                   </p>
                 )}
                 {message.attachment && <AttachmentCard attachment={message.attachment} mine={mine} />}
-                {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
+                {editingThis ? (
+                  <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+                    <textarea
+                      value={editDraft}
+                      onChange={(e) => setEditDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          void saveEdit(message);
+                        }
+                      }}
+                      autoFocus
+                      maxLength={4000}
+                      rows={Math.max(1, Math.min(4, Math.ceil((editDraft?.length ?? 0) / 40)))}
+                      className="w-full resize-none rounded-lg border border-white/15 bg-black/20 px-2 py-1.5 text-sm text-white outline-none placeholder:text-white/40 focus:border-wizard-green-500"
+                    />
+                    {editError && <p className="mt-1 text-xs text-red-400">{editError}</p>}
+                    <div className="mt-1 flex justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        disabled={editing}
+                        className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-wizard-muted transition hover:bg-white/10 hover:text-wizard-text disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void saveEdit(message)}
+                        disabled={editing || !editDraft.trim()}
+                        className="rounded-md bg-wizard-green-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
+                      >
+                        {editing ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                ) : message.content ? (
+                  <p className="whitespace-pre-wrap break-words select-text">{message.content}</p>
+                ) : null}
                 <div
                   className={`mt-1 flex items-center gap-1 text-[10px] ${
                     mine ? 'justify-end text-white/70' : 'text-wizard-muted'
                   }`}
                 >
                   <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  {message.editedAt && <span> · edited</span>}
                   {ticksFor(message, props)}
                 </div>
               </div>
@@ -455,6 +639,89 @@ export default function Conversation(props: Props) {
           </button>
         </div>
       </form>
+
+      {notice && (
+        <div className="pointer-events-none absolute bottom-20 left-1/2 z-40 -translate-x-1/2 rounded-full border border-white/10 bg-wizard-panel px-4 py-1.5 text-xs text-wizard-text shadow-xl shadow-black/40 backdrop-blur-xl">
+          {notice}
+        </div>
+      )}
+
+      {bubbleMenu && (
+        <div
+          className="fixed inset-0 z-50"
+          onClick={() => setBubbleMenu(null)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setBubbleMenu(null);
+          }}
+        >
+          <div
+            className="absolute w-52 overflow-hidden rounded-xl border border-white/10 bg-wizard-panel shadow-2xl shadow-black/60 backdrop-blur-2xl"
+            style={menuPositionStyle()}
+            onClick={(e) => e.stopPropagation()}
+            data-testid="bubble-menu"
+          >
+            <button
+              type="button"
+              onClick={() => void copyMessage(bubbleMenu.message)}
+              disabled={!bubbleMenu.message.content && !bubbleMenu.message.attachment}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-wizard-text transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <span className="text-base">📋</span> Copy
+            </button>
+            {bubbleMenu.message.attachment && (
+              <button
+                type="button"
+                onClick={() => void downloadMessage(bubbleMenu.message)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-wizard-text transition hover:bg-white/5"
+              >
+                <span className="text-base">⬇️</span> Download
+              </button>
+            )}
+            {bubbleMenu.message.status === 'sent' && canModify(bubbleMenu.message) && (
+              <button
+                type="button"
+                onClick={() => startEdit(bubbleMenu.message)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-wizard-text transition hover:bg-white/5"
+              >
+                <span className="text-base">✏️</span> Edit
+              </button>
+            )}
+            {bubbleMenu.message.status === 'sent' && canModify(bubbleMenu.message) && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteId(bubbleMenu.message.id)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-400 transition hover:bg-red-500/10"
+                >
+                  <span className="text-base">🗑️</span> Delete
+                </button>
+                {confirmDeleteId === bubbleMenu.message.id && (
+                  <div className="border-t border-white/10 p-2">
+                    <p className="px-1 pb-1.5 text-xs text-wizard-muted">Delete this message?</p>
+                    <div className="flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => void confirmDelete()}
+                        className="rounded-md bg-red-500/90 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-red-500"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-wizard-muted transition hover:bg-white/10"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

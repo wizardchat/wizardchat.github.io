@@ -60,6 +60,7 @@ export interface SerializedMessage {
   nonce: string | null;
   attachment: AttachmentDescriptor | null;
   createdAt: string;
+  editedAt: string | null;
 }
 
 /**
@@ -79,6 +80,7 @@ export function serializeMessage(m: {
   attachmentCiphertext: string | null;
   attachmentNonce: string | null;
   createdAt: Date;
+  editedAt: Date | null;
   sender: { id: string; username: string };
 }): SerializedMessage {
   let content: string | null;
@@ -107,6 +109,7 @@ export function serializeMessage(m: {
       nonce: m.attachmentNonce,
     }),
     createdAt: m.createdAt.toISOString(),
+    editedAt: m.editedAt ? m.editedAt.toISOString() : null,
   };
 }
 
